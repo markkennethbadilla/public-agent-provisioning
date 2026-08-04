@@ -10,7 +10,7 @@
 #   per-repo:  git config core.hooksPath /path/to/this/directory
 #   global:    git config --global core.hooksPath /path/to/this/directory
 # That's it -- no copying required. Section 7 below finds its sibling
-# 05-checks-this-repo-runs-on-itself/ automatically as long as the two
+# 05-self-checks/ automatically as long as the two
 # directories stay next to each other. If you copy pre-commit/pre-push to a
 # different, stable location instead, drop a ".guard-root" file beside them
 # containing the absolute path back to this template (see README.md).
@@ -183,27 +183,64 @@ done
 # ---- 7. GUARD SELF-INTEGRITY -----------------------------------------------
 # The most important section: if the enforcement layer itself is broken, that
 # must ALSO block the commit -- otherwise a deleted or tampered self-check is
-# the thing that lets bad commits back in. Finds 05-checks-this-repo-runs-on-itself/
+# the thing that lets bad commits back in. Finds 05-self-checks/
 # either as a sibling of this file (direct-pointer install) or via a
 # ".guard-root" pointer dropped beside this file (copied-install).
+#
+# The question this answers (see 05-self-checks/README.md): "is the reviewed
+# guard the one actually running, byte for byte, right now, on this
+# machine?" -- a tamper/drift question, answered with a byte compare, never
+# by re-running the full behavioural suite (that would mean every ordinary
+# commit recursively spawns the whole scratch-repo test harness -- expensive
+# and, since scratch repos commit through hooks that hit this same section,
+# unbounded recursion). REVIEWED = wherever GUARD_ROOT itself (as a git repo)
+# declares its own hooks live (its own core.hooksPath, self-hosting); if it
+# has none, REVIEWED falls back to GUARD_ROOT/04-git-guards-that-block-commits-and-pushes.
+# LIVE = $HOOK_DIR, the directory actually enforcing THIS commit. A missing
+# sibling must ERROR AND BLOCK -- a guard that quietly no-ops when it can't
+# find its own self-check layer is the exact failure this repo exists to
+# prevent, so there is no silent-skip path below: every branch either passes
+# cleanly or calls block().
 GUARD_ROOT="$(cat "$HOOK_DIR/.guard-root" 2>/dev/null || true)"
-if [ -z "$GUARD_ROOT" ] && [ -d "$HOOK_DIR/../05-checks-this-repo-runs-on-itself" ]; then
+if [ -z "$GUARD_ROOT" ] && [ -d "$HOOK_DIR/../05-self-checks" ]; then
   GUARD_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
 fi
-if [ -n "$GUARD_ROOT" ] && command -v node >/dev/null 2>&1; then
-  _sc="$GUARD_ROOT/05-checks-this-repo-runs-on-itself"
-  for _g in verify-git-guards.mjs verify-gates-can-fail.mjs; do
-    if [ -f "$_sc/$_g" ]; then
-      ( cd "$GUARD_ROOT" && node "$_sc/$_g" >/tmp/guard-self-check.$$.log 2>&1 )
-      if [ $? -ne 0 ]; then
-        block "$_g FAILED -- the guard's own enforcement layer is not intact" \
-              "run: cat /tmp/guard-self-check.$$.log -- then re-run the installer to restore the guard, and re-commit"
+if [ -z "$GUARD_ROOT" ]; then
+  block "cannot locate the guard's self-check layer -- no '.guard-root' pointer beside '$HOOK_DIR' and no sibling '05-self-checks/' next to it" \
+        "restore 05-self-checks/ as a sibling of 04-git-guards-that-block-commits-and-pushes/, or drop a '.guard-root' file beside pre-commit pointing at the template root -- a missing self-check layer must block, never silently pass"
+else
+  _sc="$GUARD_ROOT/05-self-checks"
+  if [ ! -f "$_sc/verify-guards.mjs" ]; then
+    block "$_sc/verify-guards.mjs is MISSING" "restore it -- a deleted self-check must never be the thing that lets a commit pass"
+  else
+    # `git rev-parse` prints Windows-drive-letter paths (C:/...) on this
+    # platform while `pwd` (used to build GUARD_ROOT above) prints MSYS
+    # POSIX-style paths (/c/... or /tmp/...) for the SAME directory -- a
+    # naive string compare of the two would never match even when they are
+    # identical, silently disabling the self-hosting branch. Route both
+    # through `cd ... && pwd` so they land in the same representation before
+    # comparing.
+    _reviewed_hooks=""
+    _top_raw="$(git -C "$GUARD_ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
+    _top="$( [ -n "$_top_raw" ] && cd "$_top_raw" 2>/dev/null && pwd || true )"
+    if [ -n "$_top" ] && [ "$_top" = "$GUARD_ROOT" ]; then
+      _declared="$(git -C "$GUARD_ROOT" config --get core.hooksPath 2>/dev/null || true)"
+      if [ -n "$_declared" ]; then
+        _reviewed_hooks="$(cd "$_declared" 2>/dev/null && pwd || true)"
+        [ -z "$_reviewed_hooks" ] && _reviewed_hooks="$(cd "$GUARD_ROOT/$_declared" 2>/dev/null && pwd || true)"
       fi
-      rm -f "/tmp/guard-self-check.$$.log" 2>/dev/null
-    else
-      block "$_sc/$_g is MISSING" "restore it -- a deleted self-check must never be the thing that lets a commit pass"
     fi
-  done
+    [ -z "$_reviewed_hooks" ] && _reviewed_hooks="$GUARD_ROOT/04-git-guards-that-block-commits-and-pushes"
+
+    if [ ! -d "$_reviewed_hooks" ]; then
+      block "reviewed guard directory '$_reviewed_hooks' does not exist" \
+            "restore it -- the self-integrity check has nothing to compare the live guard against"
+    elif ! diff -rq "$_reviewed_hooks" "$HOOK_DIR" >/tmp/guard-drift.$$.log 2>&1; then
+      block "live guard directory ('$HOOK_DIR') has drifted from the reviewed copy ('$_reviewed_hooks')" \
+            "see /tmp/guard-drift.$$.log for the diff -- restore the live copy from the reviewed source, or update the reviewed source if the change was deliberate and reviewed"
+    fi
+    rm -f "/tmp/guard-drift.$$.log" 2>/dev/null
+  fi
 fi
 
 # ---- 8. DEPENDENCY ADOPTION GATE (supply-chain) ----------------------------

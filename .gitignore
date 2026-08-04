@@ -1,0 +1,42 @@
+# Per-clone install artifacts -- created by install.sh / install.ps1 or by
+# following guardrc.example, never meant to be committed to the template.
+.guardrc
+
+# OS cruft
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# Editors
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (only relevant if a fork adds a package.json; the template itself
+# ships none)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local env / secrets -- never belongs in a public template
+.env
+.env.*
+!.env.example
+
+# Python bytecode -- the hooks in 03-hooks/ are Python, so running them (or the
+# self-checks that run them) leaves __pycache__ behind. Compiled bytecode must
+# never ship in a template people are meant to read.
+__pycache__/
+*.py[cod]
+
+# Misc local artifacts
+*.tmp
+*.log

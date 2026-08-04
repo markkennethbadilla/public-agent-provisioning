@@ -6,7 +6,7 @@ and every block prints what was wrong plus a concrete fix — never a bare "no".
 
 | File | Runs when you… | Blocks on… |
 |---|---|---|
-| `pre-commit` | save a change (`git commit`) | a leaked secret, a giant file, leftover debug code, an unpinned/floating dependency, a stray or nested repo, committing in a shared checkout another worktree is using, or a broken guard (see `05-checks-this-repo-runs-on-itself/`) |
+| `pre-commit` | save a change (`git commit`) | a leaked secret, a giant file, leftover debug code, an unpinned/floating dependency, a stray or nested repo, committing in a shared checkout another worktree is using, or a broken guard (see `05-self-checks/`) |
 | `pre-push` | upload changes (`git push`) | the wrong repo/account, a rewritten (force-pushed/rebased/amended) published history, a deleted remote branch, a direct push to `main` on a repo you don't own, or your own project's build gates failing |
 
 ## Install
@@ -21,7 +21,7 @@ git config --global core.hooksPath /path/to/04-git-guards-that-block-commits-and
 If you'd rather copy `pre-commit`/`pre-push` to a stable central location
 instead of pointing at this folder directly, drop a file named `.guard-root`
 next to the copies, containing the absolute path back to this template repo.
-`pre-commit` section 7 (and `05-checks-this-repo-runs-on-itself/verify-git-guards.mjs`)
+`pre-commit` section 7 (and `05-self-checks/verify-git-guards.mjs`)
 use it to find the self-check suite from any repo on the machine.
 
 ## Configure
@@ -37,7 +37,7 @@ forward-only history, and dependency pinning.
 ## Never bypass with `--no-verify`
 
 If a check is wrong, fix the check. Routing around a red gate is how a
-guardrail becomes theatre — see `05-checks-this-repo-runs-on-itself/` for how
+guardrail becomes theatre — see `05-self-checks/` for how
 this template proves its own guards are still live and still capable of
 firing, not just present.
 
