@@ -1,0 +1,274 @@
+#!/bin/bash
+# ============================================================================
+# GATE, DON'T ASK -- pre-commit
+#
+# A physical guard, not a reminder. Blocks `git commit` (exit 1) and prints
+# WHAT was wrong plus a concrete FIX on every violation. Never weaken a
+# section here to get a commit through -- fix the code, not the gate.
+#
+# INSTALL (pick one):
+#   per-repo:  git config core.hooksPath /path/to/this/directory
+#   global:    git config --global core.hooksPath /path/to/this/directory
+# That's it -- no copying required. Section 7 below finds its sibling
+# 05-checks-this-repo-runs-on-itself/ automatically as long as the two
+# directories stay next to each other. If you copy pre-commit/pre-push to a
+# different, stable location instead, drop a ".guard-root" file beside them
+# containing the absolute path back to this template (see README.md).
+#
+# CONFIGURE: copy guardrc.example to ".guardrc" (repo root, or beside this
+# file) and fill in your own values. Every section that reads a .guardrc
+# variable degrades to "not enforced" -- never to "blocks everything" -- when
+# that variable is unset, so an unconfigured clone still gets the checks that
+# need no configuration.
+# ============================================================================
+set -u
+RED='\033[91m'; YEL='\033[93m'; GRN='\033[92m'; NC='\033[0m'
+fail=0
+block() { printf "${RED}GATE BLOCKED COMMIT -- %s${NC}\n" "$1"; printf "   -> FIX: %s\n" "$2"; fail=1; }
+
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+for _rc in "$HOOK_DIR/.guardrc" "$(git rev-parse --show-toplevel 2>/dev/null)/.guardrc"; do
+  [ -f "$_rc" ] && { . "$_rc"; break; }
+done
+MAX_FILE_LINES="${MAX_FILE_LINES:-400}"
+
+# Staged files (added/copied/modified), NUL-safe.
+mapfile -d '' -t STAGED < <(git diff --cached --name-only -z --diff-filter=ACM)
+
+is_vendored() {
+  case "$1" in
+    */node_modules/*|node_modules/*|*/dist/*|dist/*|*/build/*|build/*|\
+    */.venv/*|.venv/*|*/vendor/*|vendor/*|*/.git/*|*.min.js|*.min.css|*.lock|*lock.json|\
+    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.pdf|*.zip|*.tar|*.gz|*.woff*|*.ttf|*.map) return 0;;
+  esac
+  return 1
+}
+
+# ---- 1. ONE WORKTREE PER CONTRIBUTOR/AGENT ---------------------------------
+# Several agents (or people) committing in ONE checkout share a single index
+# and a single HEAD -- they stage over each other, stash each other's work,
+# switch each other's branch mid-edit. Two branches in the same directory do
+# not fix that; the fight is over the working tree, not the branch name. So:
+# if this repo already has OTHER worktrees, the primary checkout is not yours
+# to commit in -- go get your own (`git worktree add ../<name> <branch>`).
+# Merges always pass: merging a finished branch is legitimate primary-checkout
+# work. ${VAR:-}, not $VAR: this runs under `set -u`, so a bare reference to
+# an unset escape-hatch variable must not abort the hook into an unchecked
+# "pass" -- that is a gate that fails OPEN, the worst kind.
+if [ -z "${WORKTREE_OK:-}" ]; then
+  _git_dir="$(git rev-parse --git-dir 2>/dev/null)"
+  _common_dir="$(git rev-parse --git-common-dir 2>/dev/null)"
+  if [ -n "$_git_dir" ] && [ "$_git_dir" = "$_common_dir" ]; then
+    if ! git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+      _others="$(git worktree list --porcelain 2>/dev/null | grep -c '^worktree ' || echo 1)"
+      if [ "$_others" -gt 1 ]; then
+        _repo="$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")"
+        block "committing in the PRIMARY checkout of '$_repo', which has $((_others - 1)) other worktree(s)" \
+              "give yourself your own worktree, then commit there:
+       git worktree add ../${_repo}-$(whoami 2>/dev/null || echo agent) \$(git branch --show-current)
+     Your staged work is untouched -- move it across with 'git stash' or re-apply it there.
+     Merging a finished branch into main is exempt and needs no worktree.
+     Genuinely the only contributor here? WORKTREE_OK=1 git commit ..."
+      fi
+    fi
+  fi
+fi
+
+# ---- 2. SECRET SCAN (gitleaks on staged content) --------------------------
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks git --staged --redact --no-banner >/dev/null 2>&1; then
+    block "secret/credential detected in staged changes" \
+          "remove the secret; read credentials from your secret store / env, never commit them. Run: gitleaks git --staged --verbose"
+  fi
+else
+  block "gitleaks is not installed (cannot prove no secrets)" \
+        "install it -- https://github.com/gitleaks/gitleaks (a missing scanner is a FAIL, never a silent skip)"
+fi
+
+# ---- 3. PER-FILE CHECKS: mega-file cap + no debug statements --------------
+if [ ${#STAGED[@]} -gt 0 ] && command -v node >/dev/null 2>&1; then
+  if ! _s2_out=$(printf '%s\n' "${STAGED[@]}" | node --input-type=module -e '
+const fs = await import("node:fs");
+const { execSync } = await import("node:child_process");
+const files = fs.readFileSync(0, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
+const maxLines = parseInt(process.env.MAX_FILE_LINES || "400", 10);
+let fail = false;
+const isVendored = (f) => /node_modules|dist|build|\.venv|vendor|\.git|\.min\.(js|css)|\.lock|\.(png|jpg|jpeg|gif|webp|ico|pdf|zip|tar|gz|woff2?|ttf|map)$/i.test(f);
+const isGeneratedOrDocs = (f) => /\.md$/i.test(f) || /migrations\/.*\.sql$/i.test(f);
+const isCli = (f, content) => {
+  if (/\.(mjs|cjs)$/i.test(f)) return true;
+  if (/verify|[-_]cli\.|(^|[/\\\\])cli[/\\\\]|(^|[/\\\\])scripts[/\\\\]|(^|[/\\\\])bin[/\\\\]|hook|migrate|(^|[/\\\\])db[/\\\\]|(^|[/\\\\])migrations[/\\\\]/i.test(f)) return true;
+  if (content.startsWith("#!")) return true;
+  return false;
+};
+for (const f of files) {
+  if (isVendored(f) || !fs.existsSync(f)) continue;
+  if (!/\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|css|scss|html|vue|svelte|sql|sh|md)$/i.test(f)) continue;
+  let content = "";
+  try { content = execSync(`git show ":${f}"`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }); }
+  catch { try { content = fs.readFileSync(f, "utf-8"); } catch { continue; } }
+  const lines = content.split("\n").length;
+  if (!isGeneratedOrDocs(f) && lines > maxLines) {
+    console.error(`\x1b[91mGATE BLOCKED COMMIT -- mega-file: '"'"'${f}'"'"' is ${lines} lines (>${maxLines} cap)\x1b[0m`);
+    console.error(`   -> FIX: split it -- extract a module the moment a file does two jobs`);
+    fail = true;
+  }
+  if (/\.(ts|tsx|js|jsx|mjs|cjs|vue|svelte)$/i.test(f) && !isCli(f, content)) {
+    if (/(^|[^.\w])(console\.(log|debug)|debugger)\b/.test(content)) {
+      console.error(`\x1b[91mGATE BLOCKED COMMIT -- debug code in '"'"'${f}'"'"' (console.log/debug or debugger)\x1b[0m`);
+      console.error(`   -> FIX: remove it before committing (CLI tools/verifiers are exempt)`);
+      fail = true;
+    }
+  }
+}
+if (fail) process.exit(1);
+' 2>&1); then
+    printf "%s\n" "$_s2_out"
+    fail=1
+  fi
+fi
+
+# ---- 4. STRAY / NESTED REPO GUARD (only if ACCOUNT_MAP is configured) -----
+# A .git appearing somewhere it should not: outside every root you told
+# .guardrc you own, or nested inside another repo (a swallowed-child repo).
+# Escape hatch: GIT_GUARD_ALLOW_FOREIGN=1.
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
+root_lc=$(printf '%s' "$repo_root" | tr '[:upper:]' '[:lower:]')
+if [ -n "${ACCOUNT_MAP:-}" ] && [ "${GIT_GUARD_ALLOW_FOREIGN:-0}" != "1" ]; then
+  _under_known=0
+  for _pair in $ACCOUNT_MAP; do
+    _frag="${_pair%%=*}"
+    case "$root_lc" in *"$(printf '%s' "$_frag" | tr '[:upper:]' '[:lower:]')"*) _under_known=1; break;; esac
+  done
+  if [ "$_under_known" -eq 0 ]; then
+    block "repo root ('$repo_root') is not under any root listed in ACCOUNT_MAP -- stray/foreign .git?" \
+          "move it under a known root, add the fragment to .guardrc, or set GIT_GUARD_ALLOW_FOREIGN=1 if deliberate"
+  fi
+fi
+parent=$(dirname "$repo_root")
+outer=$(cd "$parent" 2>/dev/null && env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git rev-parse --show-toplevel 2>/dev/null)
+# A LINKED WORKTREE is not a nested repo -- both trees share ONE object store,
+# so an identical --git-common-dir proves same-repository rather than a stray
+# .git. A real stray .git has its own common dir and still blocks.
+inner_common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+outer_common=$(cd "$parent" 2>/dev/null && env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+  git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+if [ -n "$outer" ] && [ "$outer" != "$repo_root" ] &&
+   ! { [ -n "$inner_common" ] && [ "$inner_common" = "$outer_common" ]; }; then
+  block "nested git repo: a PARENT directory ('$outer') is also a git repo" \
+        "remove the unintended .git (archive it first), or use a proper submodule"
+fi
+
+# ---- 5. FORWARD-ONLY hint (amend of a pushed commit) -----------------------
+if git rev-parse --verify -q HEAD >/dev/null 2>&1; then
+  if [ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" != "HEAD" ] && \
+     [ -n "$(git branch -r --contains HEAD 2>/dev/null)" ]; then
+    printf "${YEL}note: HEAD is already pushed -- forward-only policy: make a NEW commit, never 'git commit --amend' / rebase a pushed commit (pre-push blocks a rewrite).${NC}\n"
+  fi
+fi
+
+# ---- 6. REPO-LOCAL EXTRA GATE (plug-in point) ------------------------------
+# A consumer repo adds its own project-specific rules WITHOUT editing this
+# shared hook by dropping an executable guard.local.sh (or scripts/guard.local.sh)
+# at its root. Runs on every commit in that repo; blocks on nonzero exit.
+for _cand in "guard.local.sh" "scripts/guard.local.sh"; do
+  if [ -f "$_cand" ]; then
+    if ! bash "$_cand"; then
+      block "repo-local gate '$_cand' failed" "fix what it reported above"
+    fi
+    break
+  fi
+done
+
+# ---- 7. GUARD SELF-INTEGRITY -----------------------------------------------
+# The most important section: if the enforcement layer itself is broken, that
+# must ALSO block the commit -- otherwise a deleted or tampered self-check is
+# the thing that lets bad commits back in. Finds 05-checks-this-repo-runs-on-itself/
+# either as a sibling of this file (direct-pointer install) or via a
+# ".guard-root" pointer dropped beside this file (copied-install).
+GUARD_ROOT="$(cat "$HOOK_DIR/.guard-root" 2>/dev/null || true)"
+if [ -z "$GUARD_ROOT" ] && [ -d "$HOOK_DIR/../05-checks-this-repo-runs-on-itself" ]; then
+  GUARD_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
+fi
+if [ -n "$GUARD_ROOT" ] && command -v node >/dev/null 2>&1; then
+  _sc="$GUARD_ROOT/05-checks-this-repo-runs-on-itself"
+  for _g in verify-git-guards.mjs verify-gates-can-fail.mjs; do
+    if [ -f "$_sc/$_g" ]; then
+      ( cd "$GUARD_ROOT" && node "$_sc/$_g" >/tmp/guard-self-check.$$.log 2>&1 )
+      if [ $? -ne 0 ]; then
+        block "$_g FAILED -- the guard's own enforcement layer is not intact" \
+              "run: cat /tmp/guard-self-check.$$.log -- then re-run the installer to restore the guard, and re-commit"
+      fi
+      rm -f "/tmp/guard-self-check.$$.log" 2>/dev/null
+    else
+      block "$_sc/$_g is MISSING" "restore it -- a deleted self-check must never be the thing that lets a commit pass"
+    fi
+  done
+fi
+
+# ---- 8. DEPENDENCY ADOPTION GATE (supply-chain) ----------------------------
+# Adopting a dependency is itself gated, not a rule you remember to follow.
+# Registry hijacks land as a malicious version bump under the SAME name,
+# auto-adopted by anyone on a semver RANGE. A commit that adds a dependency
+# to package.json must pin it EXACT (no ^ ~ * x latest, no git ref without a
+# full 40-char SHA) and must not name-collide with a known-bad squat.
+_dep_pkg=""
+for f in "${STAGED[@]}"; do case "$f" in package.json|*/package.json) _dep_pkg="$f";; esac; done
+if [ -n "$_dep_pkg" ] && command -v node >/dev/null 2>&1; then
+  while IFS= read -r pair; do
+    if [[ "$pair" =~ ^\"([^\"]+)\"[[:space:]]*:[[:space:]]*\"([^\"]+)\"$ ]]; then
+      name="${BASH_REMATCH[1]}"; spec="${BASH_REMATCH[2]}"
+      if [ -z "${_DEP_KEYS+x}" ]; then
+        _DEP_KEYS=" $(node "$(dirname "$0")/depkeys.mjs" "$_dep_pkg" 2>/dev/null) "
+      fi
+      case " $_DEP_KEYS " in *" $name "*) ;; *) continue;; esac
+      case "$name" in name|version|description|main|module|types|license|author|homepage|repository|bugs|type|private|packageManager|sideEffects) continue;; esac
+      if [ -z "${_HEAD_PKG+x}" ]; then _HEAD_PKG="$(git show HEAD:"$_dep_pkg" 2>/dev/null)"; fi
+      _old_spec="$(printf %s "$_HEAD_PKG" | node "$(dirname "$0")/depval.mjs" "$name" 2>/dev/null)"
+      if [ -n "$_old_spec" ] && [ "$_old_spec" = "$spec" ]; then continue; fi
+      # Example known-bad squat -- extend this list as you find more.
+      if [ "$name" = "dotenv-linter" ]; then
+        block "dependency '$name' is a known name-collision squat (abandoned npm pkg masquerading as the Rust tool)" \
+              "do NOT add the npm 'dotenv-linter'; use the Rust binary release instead"
+        continue
+      fi
+      case "$spec" in workspace:*|catalog:*|file:*|link:*|portal:*) continue;; esac
+      case "$spec" in
+        git+*|git:*|http://*|https://*|github:*|*://*)
+          case "$spec" in
+            *"#"[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
+            *) block "new dependency '$name' uses an UNPINNED git/URL ref: '$spec'" \
+                     "pin it to a full 40-char commit SHA (name#<sha>) so a moved ref can't swap the code" ;;
+          esac
+          continue ;;
+      esac
+      case "$spec" in
+        *"^"*|*"~"*|*"*"*|*"x"*|*"X"*|*"<"*|*">"*|latest|"")
+          block "new dependency '$name' is a FLOATING range: '$spec' -- adoption must be a deliberate, reviewed pin" \
+                "pin the EXACT vetted version; floating ranges auto-adopt hijacked version bumps" ;;
+      esac
+    fi
+  done < <(git diff --cached -U0 -- "$_dep_pkg" | grep -E '^\+' | grep -vE '^\+\+\+' \
+            | grep -oE '"[^"]+"[[:space:]]*:[[:space:]]*"[^"]+"')
+fi
+
+# ---- 9. LOCKFILE CONVENTION (only if REQUIRED_PACKAGE_MANAGER is set) -----
+if [ -n "${REQUIRED_PACKAGE_MANAGER:-}" ]; then
+  for f in "${STAGED[@]}"; do
+    case "$REQUIRED_PACKAGE_MANAGER:$f" in
+      bun:package-lock.json|bun:*/package-lock.json|bun:yarn.lock|bun:*/yarn.lock|bun:pnpm-lock.yaml|bun:*/pnpm-lock.yaml) \
+        block "non-bun lockfile staged: '$f'" "REQUIRED_PACKAGE_MANAGER=bun -- remove it, use 'bun install'";;
+      npm:yarn.lock|npm:*/yarn.lock|npm:pnpm-lock.yaml|npm:*/pnpm-lock.yaml|npm:bun.lock|npm:*/bun.lock) \
+        block "non-npm lockfile staged: '$f'" "REQUIRED_PACKAGE_MANAGER=npm -- remove it, use 'npm install'";;
+      pnpm:package-lock.json|pnpm:*/package-lock.json|pnpm:yarn.lock|pnpm:*/yarn.lock|pnpm:bun.lock|pnpm:*/bun.lock) \
+        block "non-pnpm lockfile staged: '$f'" "REQUIRED_PACKAGE_MANAGER=pnpm -- remove it, use 'pnpm install'";;
+    esac
+  done
+fi
+
+if [ "$fail" -ne 0 ]; then
+  printf "${YEL}-- GATE, DON'T ASK: fix the cause above, then re-commit. Never bypass with --no-verify.${NC}\n"
+  exit 1
+fi
+printf "${GRN}pre-commit gate green${NC}\n"
+exit 0

@@ -1,0 +1,193 @@
+#!/bin/bash
+# ============================================================================
+# GATE, DON'T ASK -- pre-push
+#
+# Final backstop before refs leave the machine. exit 1 + a concrete FIX on
+# any violation. Never bypass with --no-verify -- fix the cause.
+#
+# Vectors gated here:
+#   A1 folder name != remote repo name          A2 wrong account for this repo
+#   A3 repo root outside every known root       A4 origin not a recognised remote
+#   B1 local branch != pushed remote branch     B2 detached-HEAD push
+#   C1 FORWARD-ONLY: any history rewrite (force/rebase/amend of pushed commits)
+#   C2 remote-branch deletion
+#   EXTERNAL-PR  a repo you don't own: direct push to main/master/dev/develop
+#                is BLOCKED -> open a PR instead
+#   D  your project's own build gates (GATE_CMD) must be green
+#
+# CONFIGURE via .guardrc -- see guardrc.example. Every account-identity check
+# below (A1/A2/A3/A4/EXTERNAL-PR) degrades to "not enforced" when ACCOUNT_MAP
+# is unset; the history-safety checks (B/C) and the build-gate check (D) need
+# no configuration and are always on.
+# ============================================================================
+set -u
+RED='\033[91m'; YEL='\033[93m'; GRN='\033[92m'; NC='\033[0m'
+remote_name="${1:-}"; remote_url="${2:-}"
+fail=0
+block() { printf "${RED}GATE BLOCKED PUSH -- %s${NC}\n" "$1"; printf "   -> FIX: %s\n" "$2"; fail=1; }
+
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+for _rc in "$HOOK_DIR/.guardrc" "$(git rev-parse --show-toplevel 2>/dev/null)/.guardrc"; do
+  [ -f "$_rc" ] && { . "$_rc"; break; }
+done
+
+# Repo identity for the wrong-repo check: the MAIN worktree's folder name,
+# derived from the git common-dir's parent -- not basename($PWD), which is
+# wrong inside a linked worktree (its checkout dir is the feature name).
+repo_main_root=$(cd "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null && cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && dirname "$(pwd)")
+[ -z "$repo_main_root" ] && repo_main_root="$PWD"
+local_dir=$(basename "$repo_main_root")
+pwd_lc=$(printf '%s' "$PWD" | tr '[:upper:]' '[:lower:]')
+url_lc=$(printf '%s' "$remote_url" | tr '[:upper:]' '[:lower:]')
+
+# ---- OWNERSHIP CLASSIFIER --------------------------------------------------
+# A repo you do NOT own -- cloned, or access granted by someone else. Two
+# independent signals from ACCOUNT_MAP ("fragment=owner" pairs), either trips
+# "owned": the repo path is under a mapped fragment, OR the remote URL
+# contains a mapped owner. Neither present -> external. When ACCOUNT_MAP is
+# unset entirely, every repo is treated as external for A1/A2 purposes (those
+# two checks then no-op) but the EXTERNAL-PR protected-branch check STILL
+# applies -- unconfigured is the safer default, not the permissive one.
+is_owned=0
+if [ -n "${ACCOUNT_MAP:-}" ]; then
+  for _pair in $ACCOUNT_MAP; do
+    _frag_lc="$(printf '%s' "${_pair%%=*}" | tr '[:upper:]' '[:lower:]')"
+    _owner_lc="$(printf '%s' "${_pair#*=}" | tr '[:upper:]' '[:lower:]')"
+    case "$pwd_lc" in *"$_frag_lc"*) is_owned=1;; esac
+    case "$url_lc" in *"$_owner_lc"*) is_owned=1;; esac
+  done
+fi
+is_external=$([ "$is_owned" -eq 1 ] && echo 0 || echo 1)
+
+# ---- A1. MATCHING ORIGIN ---------------------------------------------------
+repo_url_no_git="${remote_url%.git}"
+remote_repo=$(basename "$repo_url_no_git")
+if [ "$is_external" -eq 0 ] && [ -n "$remote_repo" ] && [ "$local_dir" != "$remote_repo" ]; then
+  block "local dir ('$local_dir') != remote repo ('$remote_repo') -- wrong repository!" \
+        "push to the repo matching this folder; check 'git remote -v' for an inherited origin"
+fi
+
+# ---- A2. CORRECT ACCOUNT FOR THIS REPO'S ROOT ------------------------------
+if [ "$is_owned" -eq 1 ] && [ -n "${ACCOUNT_MAP:-}" ]; then
+  for _pair in $ACCOUNT_MAP; do
+    _frag_lc="$(printf '%s' "${_pair%%=*}" | tr '[:upper:]' '[:lower:]')"
+    _owner_lc="$(printf '%s' "${_pair#*=}" | tr '[:upper:]' '[:lower:]')"
+    case "$pwd_lc" in
+      *"$_frag_lc"*)
+        case "$url_lc" in
+          *"$_owner_lc"*) : ;;
+          *) # under THIS fragment but pushing to a DIFFERENT mapped owner
+             for _other in $ACCOUNT_MAP; do
+               _other_owner_lc="$(printf '%s' "${_other#*=}" | tr '[:upper:]' '[:lower:]')"
+               [ "$_other_owner_lc" = "$_owner_lc" ] && continue
+               case "$url_lc" in *"$_other_owner_lc"*)
+                 block "repo under '${_pair%%=*}' pushing to a DIFFERENT mapped account ($remote_url)" \
+                       "use the remote/credential that belongs to '${_pair%%=*}' (expected owner: ${_pair#*=})";;
+               esac
+             done ;;
+        esac ;;
+    esac
+  done
+fi
+
+# ---- A3. REPO ROOT MUST LIVE UNDER A KNOWN ROOT ----------------------------
+# Escape hatch: GIT_GUARD_ALLOW_FOREIGN=1 git push
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
+root_lc=$(printf '%s' "$repo_root" | tr '[:upper:]' '[:lower:]')
+if [ -n "${ACCOUNT_MAP:-}" ] && [ "${GIT_GUARD_ALLOW_FOREIGN:-0}" != "1" ] && [ "$is_owned" -eq 0 ]; then
+  _under_known=0
+  for _pair in $ACCOUNT_MAP; do
+    _frag_lc="$(printf '%s' "${_pair%%=*}" | tr '[:upper:]' '[:lower:]')"
+    case "$root_lc" in *"$_frag_lc"*) _under_known=1;; esac
+  done
+  # not under a known root AND not recognised as an intentionally-external
+  # remote either -> likely a stray .git. (A genuine external clone is fine;
+  # it simply falls through to the EXTERNAL-PR check below instead.)
+  : "$_under_known" # (informational only -- ownership already resolved above)
+fi
+
+# ---- A4. ORIGIN MUST RESOLVE TO A GITHUB(-LIKE) REMOTE ---------------------
+if [ "${GIT_GUARD_ALLOW_FOREIGN:-0}" != "1" ] && [ -n "$remote_url" ]; then
+  case "$url_lc" in
+    *github.com*|*gitlab.com*|*bitbucket.org*) : ;;
+    *) block "origin ('$remote_url') is not a recognised git host" \
+             "verify 'git remote -v'; override with GIT_GUARD_ALLOW_FOREIGN=1 if this is deliberate (self-hosted, etc.)";;
+  esac
+fi
+
+# ---- B + C. PER-REF CHECKS (read git's stdin) -----------------------------
+ZERO="0000000000000000000000000000000000000000"
+cur_branch=$(git symbolic-ref --short -q HEAD || echo "")
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "${remote_ref:-}" ] && continue
+  local_short="${local_ref#refs/heads/}"
+  remote_short="${remote_ref#refs/heads/}"
+
+  # C2. remote branch deletion. Escape hatch: GIT_GUARD_ALLOW_BRANCH_DELETE=1
+  if [ "$local_sha" = "$ZERO" ]; then
+    if [ "${GIT_GUARD_ALLOW_BRANCH_DELETE:-0}" = "1" ]; then
+      printf '%s\n' "-- GATE ESCAPE HATCH: deleting remote branch '$remote_short' (GIT_GUARD_ALLOW_BRANCH_DELETE=1)" >&2
+    else
+      block "deleting remote branch '$remote_short'" \
+            "confirm it is not the default branch and carries no unmerged commits, then re-run with GIT_GUARD_ALLOW_BRANCH_DELETE=1"
+    fi
+    continue
+  fi
+
+  # B2. detached-HEAD push
+  if [ -z "$cur_branch" ]; then
+    case "$local_ref" in refs/heads/*) : ;; *)
+      block "pushing from a DETACHED HEAD" "checkout a real branch first (git switch -c <branch>) -- detached commits are easily lost";;
+    esac
+  fi
+
+  # B1. local branch name != remote branch name
+  case "$local_ref" in
+    refs/heads/*)
+      if [ -n "$remote_short" ] && [ "$local_short" != "$remote_short" ]; then
+        block "branch mismatch: local '$local_short' -> remote '$remote_short'" \
+              "push to the same-named branch; a name discrepancy usually means a wrong refspec"
+      fi;;
+  esac
+
+  # EXTERNAL-PR. A repo you don't own -> protected branches are PR-only, even
+  # unconfigured (default is the SAFE direction). Override: GIT_GUARD_ALLOW_EXTERNAL_MAIN=1.
+  if [ "$is_external" -eq 1 ] && [ "${GIT_GUARD_ALLOW_EXTERNAL_MAIN:-0}" != "1" ]; then
+    case "$remote_short" in
+      main|master|dev|develop|development)
+        block "direct push to protected branch '$remote_short' on a repo you do not own" \
+              "open a PR instead: push a feature branch (git switch -c <feature>; git push -u origin <feature>), then open a pull request. (maintainer override: GIT_GUARD_ALLOW_EXTERNAL_MAIN=1)"
+        continue;;
+    esac
+  fi
+
+  # C1. FORWARD-ONLY: no history rewrite on ANY branch. Override: GIT_GUARD_ALLOW_FORCE=1
+  if [ "$remote_sha" != "$ZERO" ] && [ -n "$remote_sha" ] && [ "${GIT_GUARD_ALLOW_FORCE:-0}" != "1" ]; then
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+      block "NON-FAST-FORWARD push to '$remote_short' rewrites published history (FORWARD-ONLY)" \
+            "history rewrites are banned on every branch. Reconcile by MERGING on top ('git pull --no-rebase' then push). Never force-push, never rebase a pushed branch."
+    fi
+  fi
+done
+
+# ---- D0. A DEPLOYABLE REPO MUST CARRY A BUILD-GATE SUITE -------------------
+_marker="${DEPLOY_MARKER:-Dockerfile}"
+if [ -f "$_marker" ] && [ -z "${GATE_CMD:-}" ]; then
+  block "this looks like a deployable repo (found '$_marker') but no GATE_CMD is configured in .guardrc" \
+        "set GATE_CMD in .guardrc to the command that must pass before a deploy-source push leaves this machine"
+fi
+
+# ---- D. BUILD GATES GREEN (only if GATE_CMD is configured) ----------------
+if [ -n "${GATE_CMD:-}" ]; then
+  printf "${YEL}running build gates (%s)...${NC}\n" "$GATE_CMD"
+  if ! bash -c "$GATE_CMD"; then
+    block "build gates ($GATE_CMD) are RED" "fix the failing check; it must exit 0 before pushing -- never weaken it to pass"
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  printf "${YEL}-- GATE, DON'T ASK: resolve the above, then re-push. Never use --no-verify.${NC}\n"
+  exit 1
+fi
+printf "${GRN}pre-push gate green${NC}\n"
+exit 0

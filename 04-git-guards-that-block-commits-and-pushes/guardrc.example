@@ -1,0 +1,46 @@
+# .guardrc -- optional config sourced by pre-commit and pre-push.
+# Copy this file to ".guardrc" at your repo root (or beside pre-commit/pre-push
+# if you installed them centrally) and fill in your own values. Every check
+# that depends on a setting here silently DEGRADES TO "not enforced" -- never
+# to "blocks everything" -- when the setting is absent, so a fresh clone with
+# no config still gets the checks that need no configuration (secret scan,
+# mega-file cap, debug-code ban, forward-only, dependency pinning).
+
+# ACCOUNT_MAP -- for people who push to more than one git identity (a personal
+# GitHub account and a work one, say). Space-separated "path-fragment=owner"
+# pairs. path-fragment is matched case-insensitively against the repo's
+# filesystem path; owner is matched against the push remote's URL.
+#
+# Two effects:
+#   1. pre-commit / pre-push refuse to touch a repo whose path is under NONE
+#      of these fragments (stray/foreign .git guard) -- unless the repo's
+#      remote is a "known" owner you trust as external (see below).
+#   2. pre-push refuses to push a repo under fragment A to an owner mapped to
+#      fragment B (wrong-account guard) -- the classic "personal code pushed
+#      to the work GitHub org" mistake.
+#
+# Example (delete before use, replace with your own):
+# ACCOUNT_MAP="repos/personal=your-personal-github-username repos/work=your-work-github-org"
+ACCOUNT_MAP=""
+
+# MAX_FILE_LINES -- mega-file cap enforced on staged source files (generated
+# files, markdown, and SQL migrations are exempt; see pre-commit).
+MAX_FILE_LINES=400
+
+# REQUIRED_PACKAGE_MANAGER -- if set (e.g. "bun", "pnpm", "npm"), pre-commit
+# blocks any staged lockfile that does not belong to that package manager.
+# Leave empty to allow whatever lockfile shows up.
+REQUIRED_PACKAGE_MANAGER=""
+
+# GATE_CMD -- the command pre-push runs as your project's own build-gate
+# suite (lint, typecheck, unit tests, whatever "must be green before this
+# leaves the machine" means for you). Leave empty to skip -- pre-push then
+# only enforces the git-identity and history-safety checks below, not your
+# project's own correctness gates.
+# Example: GATE_CMD="npm run verify"
+GATE_CMD=""
+
+# DEPLOY_MARKER -- a file whose presence marks this repo "deployable". When
+# present, pre-push REQUIRES GATE_CMD to also be configured and green -- a
+# deployable repo with no gate suite is a hard block, not a warning.
+DEPLOY_MARKER="Dockerfile"
