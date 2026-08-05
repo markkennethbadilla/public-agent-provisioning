@@ -40,3 +40,9 @@ __pycache__/
 # Misc local artifacts
 *.tmp
 *.log
+
+# Tooling and capture artifacts. These shipped in the first version by accident:
+# a Serena symbol index and two UTF-16 terminal captures from a verify run. A
+# template whose argument is rigor cannot be handing people its own scratch output.
+.serena/
+verify-out*.txt
