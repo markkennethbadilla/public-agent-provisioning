@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [],
+    "deny": [
+      "Read(**/*.p12)",
+      "Read(**/*.pem)",
+      "Read(**/.aws/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/.netrc)",
+      "Read(**/.npmrc)",
+      "Read(**/.pypirc)",
+      "Read(**/.ssh/**)",
+      "Read(**/credentials/**)",
+      "Read(**/id_ed25519*)",
+      "Read(**/id_rsa*)",
+      "Read(**/secrets/**)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Shell(curl *|*sh*)",
+      "Shell(git clean -*)",
+      "Shell(git commit *--no-verify*)",
+      "Shell(git push *--no-verify*)",
+      "Shell(git push --force*)",
+      "Shell(git push -f*)",
+      "Shell(git reset --hard*)",
+      "Shell(rm -fr *)",
+      "Shell(rm -r *)",
+      "Shell(rm -rf *)",
+      "Shell(wget *|*sh*)",
+      "Write(**/.env)",
+      "Write(**/.ssh/**)",
+      "Write(**/credentials/**)",
+      "Write(**/secrets/**)",
+      "Write(.env)"
+    ]
+  }
+}

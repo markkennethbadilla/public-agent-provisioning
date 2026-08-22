@@ -1,0 +1,115 @@
+# Trunk is the maintained owner of the git-guard layer.
+# Docs: https://docs.trunk.io/cli
+# Format reference: https://docs.trunk.io/reference/trunk-yaml
+#
+# `trunk git-hooks sync` writes the pre-commit and pre-push hooks from the
+# `actions` block below. That one command replaces the 504 hand-written lines of
+# shell hook and the 502-line dual-platform installer this repository used to
+# ship. Trunk downloads and pins every linter itself, so a fork runs the same
+# versions on Windows, macOS and Linux without an install script.
+version: 0.1
+
+cli:
+  version: 1.25.0
+
+plugins:
+  sources:
+    - id: trunk
+      ref: v1.11.0
+      uri: https://github.com/trunk-io/plugins
+
+runtimes:
+  enabled:
+    - node@22.16.0
+
+# Vale owns prose, see .vale.ini and house rule 14. markdownlint and prettier are
+# deliberately absent. A second markdown opinion means two tools disagreeing about
+# the same line, which produces a permanently red pipeline nobody can green.
+# Trunk keeps only the checks nothing else in this repository does.
+lint:
+  enabled:
+    # Committed secrets. Roughly 200 maintained detection rules, which is why the
+    # deleted deny-secret-in-write.py and its 15 regexes are not coming back.
+    - gitleaks@8.30.1
+    # Dependencies with a known CVE, read from the lockfile.
+    - osv-scanner@2.5.1
+    # GitHub Actions workflow syntax, so a broken ci.yml fails locally not on push.
+    - actionlint@1.7.12
+    # Leftover merge conflict markers.
+    - git-diff-check
+    # Shell scripts. The template itself ships none once the hand-rolled
+    # installers are gone, so this exists for forks that add one. Trunk has no
+    # Windows build of shellcheck and prints a skip notice there. It runs in CI,
+    # which is ubuntu-latest.
+    - shellcheck@0.11.0
+  ignore:
+    - linters: [ALL]
+      paths:
+        - node_modules/**
+        # `vale sync` output, refreshed on every run and owned by errata-ai.
+        - styles/**
+
+# Trunk's stock pre-commit actions FIND a secret and then let it through.
+#
+# `trunk-check-pre-commit` and even `trunk-check-pre-push` are declared
+# `interactive: optional`, so they print the finding and then ask
+# "Changes not currently passing checks. Continue anyway? (Y/n)". With no
+# terminal attached, which is every agent, every CI runner and every editor
+# that commits for you, that prompt answers itself and the commit lands.
+# Verified here on 2026-08-22. gitleaks reported
+# "github-pat has detected secret for file leak.md" and git still exited 0.
+#
+# A check that degrades to a warning under exactly the conditions an agent
+# runs in is the failure this repository exists to rule out, so the two stock
+# actions stay off and one definition below replaces them.
+#
+# `--ci` is the documented flag that never prompts and exits non-zero on a
+# finding. Everything else is copied from the stock action, including
+# --index-file, which points the scan at the staged content rather than the
+# working tree, so amending a file after staging it cannot slip a secret past.
+actions:
+  definitions:
+    - id: block-commit-on-findings
+      display_name: Refuse a commit that fails any enabled check
+      run: trunk check --ci --no-fix -t git-commit --index-file '${env.GIT_INDEX_FILE}' --upstream=HEAD
+      triggers:
+        - git_hooks: [pre-commit]
+      notify_on_error: false
+
+    # `--all`, not `--commit-ref-from-pre-push`, and the difference is a hole
+    # this repository shipped with.
+    #
+    # git hands a pre-push hook one line per ref: `<local ref> <local sha>
+    # <remote ref> <remote sha>`. When the remote does not have the ref yet, the
+    # remote sha is forty zeros. `--commit-ref-from-pre-push` turns that into
+    # the range `000...0..<local sha>`, which resolves to nothing, so Trunk
+    # checked no files, printed no findings and exited 0. Verified here on
+    # 2026-08-22: a first `git push origin main` at a brand-new empty remote
+    # carried a live-shaped AWS key straight onto it. That is the exact push a
+    # forker makes, once, into the empty GitHub repository they just created.
+    #
+    # `--all` has no range to get wrong. It is the same check `npm run lint` and
+    # CI already run, so it raises no bar a fork was not already held to, and it
+    # took 3.3s on this repository. The price is that a finding anywhere in the
+    # working tree blocks the push, including one in a file not being pushed.
+    # A guard that is occasionally too loud beats one that is silently absent on
+    # the single push most likely to leak.
+    #
+    # Neither form reads git history, so a secret committed and then deleted in
+    # a later commit still reaches the remote when both are pushed together.
+    # Verified on 2026-08-22 against both forms. GitHub push protection is the
+    # remote-side backstop for that one; no local hook can be.
+    - id: block-push-on-findings
+      display_name: Refuse a push that fails any enabled check
+      run: trunk check --ci --no-fix -t git-push --all
+      triggers:
+        - git_hooks: [pre-push]
+      notify_on_error: false
+
+  enabled:
+    - block-commit-on-findings
+    - block-push-on-findings
+    # Formatting only, and it fixes rather than refuses, so it is safe to keep
+    # ahead of the blocking action above.
+    - trunk-fmt-pre-commit
+    - trunk-upgrade-available

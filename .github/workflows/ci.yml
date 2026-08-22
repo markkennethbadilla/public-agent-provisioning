@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only by default. Any job that needs more asks for it in its own block.
+permissions:
+  contents: read
+
+jobs:
+  # Trunk owns everything that is not prose. Committed secrets (gitleaks),
+  # dependencies with a known CVE (osv-scanner), workflow syntax (actionlint),
+  # conflict markers (git-diff-check) and shell (shellcheck). See .trunk/trunk.yaml.
+  # check-mode: all scans the whole repository. Left unset, Trunk scans only the
+  # push diff, so a quiet commit produces a green run that checked nothing.
+  trunk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          # Trunk compares against the upstream commit, so it needs the history.
+          fetch-depth: 0
+      - uses: trunk-io/trunk-action@v2.0.0
+        with:
+          check-mode: all
+
+  # House rule 14. Google style prose, blocking.
+  # fail_level error means a new error-level alert fails the build instead of
+  # becoming an annotation nobody reads. Warnings and suggestions still show up
+  # as annotations. Generated agent files are scoped out in .vale.ini, not here.
+  vale:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: vale-cli/vale-action@v3.0.0
+        with:
+          reporter: github-check
+          filter_mode: nofilter
+          fail_level: error
+
+  # rulesync generates AGENTS.md, CLAUDE.md, .cursor/rules, the Copilot
+  # instructions and .claude/skills from .rulesync/. Hand-editing any of those
+  # outputs is the drift this job catches. `--check` exits 1 when the generated
+  # files no longer match their source.
+  generated-files-match-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx rulesync generate --check
+
+  # node:test from the Node standard library, no test framework installed. Each
+  # test feeds a guard one input that must be blocked and one that must pass, so
+  # a guard that silently stops guarding fails here.
+  self-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node --test

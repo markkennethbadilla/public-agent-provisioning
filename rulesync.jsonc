@@ -1,0 +1,67 @@
+{
+  "$schema": "https://github.com/dyoshikawa/rulesync/releases/latest/download/config-schema.json",
+
+  // rulesync is the single generator for this template. Everything an agent
+  // reads (rules, skills, hooks, permissions) is written from `.rulesync/`.
+  // Never hand-edit a generated file. Edit the source here and regenerate:
+  //   npx rulesync generate
+  //
+  // `targets` uses the object form, which pairs each tool with exactly the
+  // features that tool supports. The array form plus a top-level `features`
+  // list would ask every tool for every feature, and rulesync would then warn
+  // its way through the ones a tool cannot express. The object form and a
+  // top-level `features` key cannot both be set; the loader rejects that.
+  //
+  // Target names below are the legal `--targets` values for rulesync 16.12.0,
+  // checked against `npx rulesync docs reference/supported-tools`. An invalid
+  // name is not an error. rulesync writes nothing for it and moves on, so a
+  // typo here looks exactly like a working config that produced no files.
+  //
+  // Feature support per tool is from the same table. `agentsmd` supports rules
+  // only, which is why it is the one target with a single entry.
+  "targets": {
+    // Anthropic Claude Code. Writes CLAUDE.md, .claude/skills/,
+    // .claude/settings.json (hooks + permissions).
+    "claudecode": ["rules", "skills", "hooks", "permissions"],
+
+    // The plain AGENTS.md standard (https://agents.md). No tool of its own.
+    // Many agents read this file when they have no format of their own, so it
+    // is the widest-reach target in the list for the cost of one file.
+    "agentsmd": ["rules"],
+
+    // OpenAI Codex CLI. Also writes the root AGENTS.md, which is the same file
+    // `agentsmd` writes and the same content, so the two do not fight.
+    "codexcli": ["rules", "skills", "hooks", "permissions"],
+
+    // Cursor. Writes .cursor/rules/, .cursor/hooks.json, .cursor/skills/.
+    "cursor": ["rules", "skills", "hooks", "permissions"],
+
+    // GitHub Copilot. Writes .github/copilot-instructions.md.
+    "copilot": ["rules", "skills", "hooks", "permissions"],
+
+    // OpenCode. Bring-your-own-model, so it is the target a forker uses when
+    // they are not on any vendor subscription.
+    "opencode": ["rules", "skills", "hooks", "permissions"],
+
+    // Cline. VS Code extension, large install base.
+    "cline": ["rules", "skills", "hooks", "permissions"],
+  },
+
+  // Write into the repository root. A monorepo that launches an agent per
+  // package would list each package directory here instead.
+  "outputRoots": ["."],
+
+  // `delete: false` means a regenerate never removes a file rulesync did not
+  // just write. Set it to true (or pass --delete) after renaming or removing a
+  // rule or skill, otherwise the old generated copy stays on disk and agents
+  // keep reading it.
+  "delete": false,
+
+  "verbose": false,
+  "silent": false,
+
+  // No `sources` block on purpose. `sources` pins rule and skill packages from
+  // other people's repositories, which is a good idea in a working repository
+  // and a bad default in a template. A fork should choose its own pins rather
+  // than inherit someone else's taste. Add them with `npx rulesync add <source>`.
+}

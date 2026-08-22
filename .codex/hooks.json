@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .rulesync/hooks/deny-secret-in-write.mjs",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

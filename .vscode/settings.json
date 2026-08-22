@@ -1,0 +1,22 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "rm -rf *": false,
+    "rm -fr *": false,
+    "rm -r *": false,
+    "git push --force*": false,
+    "git push -f*": false,
+    "git reset --hard*": false,
+    "git clean -*": false,
+    "git commit *--no-verify*": false,
+    "git push *--no-verify*": false,
+    "curl *|*sh*": false,
+    "wget *|*sh*": false
+  },
+  "chat.tools.edits.autoApprove": {
+    ".env": false,
+    "**/.env": false,
+    "**/credentials/**": false,
+    "**/secrets/**": false,
+    "**/.ssh/**": false
+  }
+}

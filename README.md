@@ -1,113 +1,224 @@
 # public-agent-provisioning
 
-A prompt asks an AI coding agent to behave. A gate makes misbehaving physically
-impossible — the action fails before it lands, and the failure message says
-what to do instead.
+**Guardrails for AI coding agents, wired to maintained tools instead of scripts you have to keep alive.**
 
-This repo is a template for the second kind of thing: a small, layered set of
-mechanisms — an always-on rules file, on-demand skills, a tool-call
-interceptor, git hooks, and a suite that proves the hooks still work — that
-sit around an agent instead of relying on it to remember instructions under
-pressure. Two of the five layers ship here as physically enforcing code that
-blocks on its own. Two more ship as populated templates — a rules file and
-two worked example skills, each carrying `<PLACEHOLDER: …>` markers for your
-own thresholds — that you fork and fill in rather than write from nothing.
-The fifth is described so you can build it the same way once you need it.
+An agent reads its instructions and sometimes works around them anyway. This
+repository puts five layers around the agent that refuse the bad action outright,
+and every layer is owned by software somebody else maintains.
 
-## 60-second quickstart
+Nothing here detects a secret, parses a shell command, or installs a git hook.
+`gitleaks` detects, Trunk installs, `rulesync` writes the agent config. What
+lives in this repository is the wiring between them and the tests that prove the
+wiring still refuses things.
 
-This clones the template, points git at its guard layer, then tries to commit
-a fake AWS key to prove the guard actually blocks something — not just prints
-a warning.
+## The five layers
 
-```bash
-git clone <your-fork-of-this-repo> guardrail-template
-cd guardrail-template
-git config core.hooksPath 04-git-guards-that-block-commits-and-pushes
-
-echo 'const key = "AKIAIOSFODNN7EXAMPLE";' > leak.js
-git add leak.js
-git commit -m "test"
-```
-
-Expected result: the commit is refused. If you have `gitleaks` on `PATH`, it
-catches the fake key by pattern and names the file. If you do not, the guard
-refuses anyway — a missing secret scanner is treated as a failure, never a
-silent pass, because a check that can be silently skipped is not a check
-(see "Locked decisions" in `SPEC.md`). Either way you get a nonzero exit, a
-line that says what was wrong, and a line that says the fix.
-
-Clean up the demo before doing anything real:
-
-```bash
-git reset
-rm leak.js
-```
-
-## The layers
-
-The full pattern is five numbered layers, each catching what the one before
-it missed. `PRIOR-ART.md` is the honest accounting of which parts are
-borrowed; this table is the map.
-
-| Layer | What it is | Fires when | In this template |
+| Layer | Maintained owner | Fires | You edit |
 |---|---|---|---|
-| 01 — rules loaded every turn | a small always-on instruction file, read on every single turn, capped hard so it stays read instead of skimmed | every turn, unconditionally | **template** — `AGENTS.md` (root) + `01-rules/README.md`, placeholders to fill in |
-| 02 — skills loaded on demand | topic playbooks; only a name and one-paragraph trigger description stay resident, the full body loads only when the topic actually comes up | whenever a conversation matches a skill's description | **template** — `02-skills/`, two worked examples plus `_TEMPLATE/` |
-| 03 — hooks that intercept tool calls | code that runs before an agent's tool call is allowed to execute, with the power to refuse it outright | the instant before a tool call runs | pattern only — bring your own |
-| 04 — git guards | plain `pre-commit` / `pre-push` shell hooks, no framework, no install dependency beyond git | every `git commit` / `git push` | **shipped** — `04-git-guards-that-block-commits-and-pushes/` |
-| 05 — self-checks | a suite that proves layer 04's hooks are live, byte-identical to what was reviewed, and still capable of going red, not just present | every commit (wired into 04's `pre-commit`), and on demand | **shipped** — `05-self-checks/` |
+| Rules, read every turn | `rulesync` 16.14.0 | every turn, unconditionally | `.rulesync/rules/overview.md` |
+| Skills, read on demand | `rulesync`, Anthropic Agent Skills format | when a conversation matches a skill description | `.rulesync/skills/` |
+| Tool-call hook | `rulesync` registers it, `gitleaks` 8.30.1 detects | the instant before a file write runs | `.rulesync/hooks.jsonc` |
+| Git guards | Trunk 1.25.0 | on `git commit` and `git push` | `.trunk/trunk.yaml` |
+| Self-checks | `node:test`, Node standard library | on demand and on every pull request | `tests/` |
 
-Rules and skills are what an agent *reads*; hooks, git guards, and
-self-checks are what stop it regardless of whether it read them. A rules
-file with no gate behind it is a request. A gate with no rules file
-explaining the *why* is a wall nobody understands. The layering needs both,
-in this order — which is also why layers 01 and 02 ship as templates with
-placeholders rather than opinions: your thresholds are not this project's to
-guess, but the shape they go in is.
+Rules and skills are what an agent reads. The hook, the git guards, and the
+self-checks are what stop it whether or not it read them.
 
-Read `04-git-guards-that-block-commits-and-pushes/README.md` and
-`05-self-checks/README.md` for how those two actually
-work — the escape-hatch table, the fixture-based proof that a check can go
-red, and why a hash compare alone is not enough.
+```mermaid
+flowchart LR
+    A["Agent writes a file"] --> B["PreToolUse hook"]
+    B -->|gitleaks finds a key| X["exit 2, write refused"]
+    B -->|clean| C["File lands on disk"]
+    C --> D["git commit"]
+    D -->|gitleaks finds a key| Y["exit 1, commit refused"]
+    D -->|clean| E["git push"]
+    E --> F["CI: Trunk, Vale, drift check, node --test"]
+```
 
-## Fork this and delete two thirds
+## Quickstart
 
-This is a template, not a dependency — there is nothing to `npm install` and
-nothing to keep in sync with upstream. The intended workflow:
+You need `git`, Node 22 or later, and the Trunk launcher. Trunk downloads and
+pins `gitleaks`, `osv-scanner`, `actionlint`, and `shellcheck` itself, so the
+commit gate needs nothing else on `PATH`.
 
-1. Clone or use this repo as a starting point, not a subtree or a submodule.
-2. Delete whatever does not match your stack. A Python monorepo has no use
-   for the npm-lockfile-convention check; a solo project has no use for the
-   worktree guard. Nothing here is load-bearing for anything else — read
-   each section of `pre-commit` and `pre-push`, keep what applies, cut the
-   rest.
-3. Rewrite the `<PLACEHOLDER: …>` markers in `AGENTS.md` and `02-skills/`
-   with your own thresholds, then delete the demonstration example skills
-   once you've replaced them with real ones. Build layer 03 (tool-call
-   interception) the same way once you need it — it has no scaffold here yet.
-4. Keep the discipline even after you cut the code: a check blocks outright
-   or it does not exist: it never degrades to a warning. An exception is a
-   named, logged variable that states why, in the open — never a silent edit
-   to the check itself. `SPEC.md` states this as a locked decision, not a
-   suggestion, for exactly this reason: it is the one property worth keeping
-   even after everything else has been rewritten.
+```bash
+git clone https://github.com/<your-fork>/public-agent-provisioning.git
+cd public-agent-provisioning
+npm install            # rulesync, the only npm dependency
+trunk git-hooks sync   # Trunk writes the pre-commit and pre-push hooks
+```
 
-If you outgrow plain shell hooks, a hook manager (`pre-commit`, `husky`,
-`lefthook`) is a reasonable next step for your fork. Nothing here fights
-that — the template stays framework-free only because a guardrail you cannot
-trust until you trust its own dependency tree is a worse starting point than
-a hundred lines of POSIX shell.
+Now try to commit a credential. The fake key is assembled from three fragments
+at run time, so the twenty character string never sits in this file and this
+README does not trip the repository's own scanner.
+
+```bash
+printf 'aws_access_key_id = %s%s%s\n' AKIA 3XQZP7RB 2NLKWJ4C > leak.md
+git add leak.md
+git commit -m "quickstart proof"
+```
+
+The commit is refused, `HEAD` does not move, and `leak.md` stays staged so no
+work is destroyed.
+
+```text
+leak.md:1:21
+ 1:21  high  aws-access-token has detected secret for file leak.md.
+
+Checked 1 modified file
+1 new lint issue
+Commit blocked by git hook 'block-commit-on-findings'
+```
+
+Clean up before doing anything real.
+
+```bash
+git restore --staged leak.md
+rm leak.md
+```
+
+### Prove the earlier layer as well
+
+The same scanner sits in front of the agent's own file writes, one step before
+git ever sees the content. Feed the hook the payload an agent host sends and read
+the exit code.
+
+```bash
+printf '{"tool_name":"Write","tool_input":{"file_path":"leak.md","content":"aws_access_key_id = %s%s%s"}}' \
+  AKIA 3XQZP7RB 2NLKWJ4C | node .rulesync/hooks/deny-secret-in-write.mjs
+echo "exit $?"
+```
+
+```text
+deny-secret-in-write: gitleaks matched aws-access-token in this write. Move the
+value to an environment variable or a secrets manager. If it is a false
+positive, add a gitleaks:allow comment on that line.
+exit 2
+```
+
+Exit code 2 is the only value an agent host reads as `stop, do not run this
+tool call`. This layer needs `gitleaks` on `PATH` directly, because it runs long
+before Trunk is involved. If `gitleaks` is missing the hook exits 2 and refuses
+the write rather than waving it through.
+
+## A maintained tool is not automatically a gate
+
+The self-check tier caught a real defect on its first run, in the wiring rather
+than in anybody's code.
+
+Trunk's stock pre-commit actions are declared `interactive: optional`. That
+includes `trufflehog-pre-commit`, whose own description reads `Don't allow
+secrets in commits`. They find the secret, print it, and then ask
+`Changes not currently passing checks. Continue anyway? (Y/n)`.
+
+With no terminal attached, the prompt answers itself, and the commit lands. No
+terminal attached describes every AI agent, every CI runner, and every editor
+that commits on your behalf.
+
+Reproduced on 2026-08-22 in a scratch repository running the stock
+`trunk-check-pre-commit` action with `gitleaks` enabled. `gitleaks` reported
+`aws-access-token has detected secret for file leak.md`, Trunk printed the
+prompt, `git commit` exited 0, `HEAD` moved, and the key is in the committed
+blob.
+
+The fix is six lines in `.trunk/trunk.yaml`, a custom action running
+`trunk check --ci`, which never prompts and exits non-zero on a finding. Both
+stock actions stay off.
+
+Adopting a maintained tool is the start of the job rather than the end of it,
+because a good tool's default configuration can still be a warning wearing a
+gate's name. The self-check tier is what tells you which one you got.
+
+The same tier then caught a second defect, this time in the 66 lines of guard
+code this repository does own. `NotebookEdit` sat in the hook's matcher while
+the script read only `content`, `new_string` and `edits[].new_string`, so every
+notebook write was handed an empty string and allowed through. It shipped
+broken, an adversarial test found it rather than a reading of the code, and the
+hook now reads `new_source` and returns exit 2 for a `NotebookEdit` payload
+carrying the planted AWS key.
+
+## What you get, and what you fill in
+
+| | Count | Where |
+|---|---|---|
+| Agent config files written for you | 30, across 7 agents | root `AGENTS.md` and `CLAUDE.md`, plus `.claude/`, `.cursor/`, `.codex/`, `.cline/`, `.clinerules/`, `.opencode/`, `.agents/`, `.github/`, `.vscode/` |
+| Source files that produce all 30 | 5 | `.rulesync/` |
+| Guard code you own and maintain | 66 lines, one file | `.rulesync/hooks/deny-secret-in-write.mjs` |
+| Lines you are expected to change | 7, tagged **default**, carrying 9 values | `.rulesync/rules/overview.md` |
+| Example skills to replace with real ones | 2 | `.rulesync/skills/` |
+| Self-checks that run on every pull request | 23 | `tests/` |
+
+The seven agents are Claude Code, OpenAI Codex CLI, Cursor, GitHub Copilot,
+Cline, `opencode`, and anything that reads the plain `AGENTS.md` standard.
+
+Editing a generated file by hand is the one banned move. The `--check` mode of
+`rulesync` regenerates in memory, compares, and exits 1 on any change in
+meaning. The `generated-files-match-source` job in `.github/workflows/ci.yml`
+runs it on every pull request.
+
+The comparison is semantic rather than byte for byte, so a formatting-only edit
+to a generated JSON file can slip past. Nine of the 30 generated files are JSON.
+Measured on 2026-08-22, appending a comment to each of those nine exited 0 for
+six of them, and re-minifying `.cursor/hooks.json` exited 0 as well.
+
+Every edit that changes meaning is caught. Emptying `PreToolUse`, pointing the
+hook command at `true`, moving an entry from `deny` to `allow`, and deleting a
+generated file outright each exited 1.
+
+## Fork it
+
+1. Use this repository as a template, not a submodule. There is no upstream to
+   track and no version to pin.
+2. Rewrite the seven lines tagged **default** in `.rulesync/rules/overview.md`.
+   They carry nine values, because two of the lines state a soft figure and a
+   hard one. Line budgets, the search order for prior art, and the validation
+   libraries are starting positions, not law.
+3. Replace the two example skills with your own, then run
+   `npx rulesync generate --delete` so the old generated copies go away rather
+   than lingering where agents keep reading them.
+4. Loosen `.rulesync/permissions.jsonc`. The `bash` catch-all is `ask`, which is
+   deliberately annoying on a first run. Add `allow` entries for the commands
+   your stack runs constantly instead of flipping the catch-all.
+5. Run `npm run verify` before you trust any of it. That is
+   `rulesync generate --check`, then `trunk check --all`, then `vale .`, then
+   `node --test`.
+
+## What this replaced
+
+The previous version of this repository shipped 3,649 lines of hand-written
+enforcement. Every line of it is deleted.
+
+| Layer | Was | Is now |
+|---|---|---|
+| Rules | one hand-written `AGENTS.md` carrying 8 unresolved `<PLACEHOLDER>` markers | `rulesync` writes 30 files from 5 sources |
+| Skills | a folder no agent harness ever read | `rulesync` writes `.claude/skills/` and the five equivalents |
+| Tool-call hooks | 690 lines of Python, including 16 hand-written secret patterns and a hand-written shell command parser | 66 lines of Node that shell out to `gitleaks`, which ships 222 rules in 8.30.1 |
+| Git guards | 504 lines of bash plus a 502-line installer for two platforms | `trunk git-hooks sync` |
+| Self-checks | a 152-line hand-rolled test runner | `node --test` from the Node standard library, zero test dependencies |
+
+Executable guard logic went from 1,194 lines to 66, a 94 percent cut, and the
+detection those lines used to attempt is now `gitleaks` and `osv-scanner`
+keeping their own rules current.
+
+The old quickstart is worth one line of warning. It told you to commit
+`AKIAIOSFODNN7EXAMPLE` and promised `gitleaks` would catch it. `gitleaks` 8.30.1
+reports "no leaks found" for that string, because it is a published placeholder
+from the AWS documentation, so the demonstration that sold the whole repository
+proved nothing.
+
+Every fixture here is checked against the scanner that has to catch it.
 
 ## Prior art
 
-Agent guardrails already exist, and several of them are good. This is one
-arrangement of already-known mechanisms — secret scanning, git hooks, TDD
-enforcement for agents — not a claim that any single piece is new. See
-`PRIOR-ART.md` for the specific projects checked, what each does well, and
-what none of them package together: the layering itself, and a self-check
-tier that treats an untested guardrail as equivalent to no guardrail at all.
+Agent guardrails already exist and several are good. `PRIOR-ART.md` lists what
+each project is for, which of them this repository now depends on, and the live
+star counts and last-push dates behind those calls.
+
+## Design decisions
+
+`SPEC.md` states the four decisions that are locked, the escape hatches that
+actually exist, and the things this repository is not.
 
 ## License
 
-MIT — see `LICENSE`.
+MIT. See `LICENSE`.

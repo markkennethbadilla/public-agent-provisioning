@@ -1,0 +1,60 @@
+{
+  // One hook. rulesync translates this single declaration into each agent's
+  // native hook registration, so nothing here is written into an agent's
+  // settings file by hand. Regenerate with `npx rulesync generate`.
+  //
+  // The whole hook is 45 lines because gitleaks does the detecting. The layer
+  // this replaces was 15 hand-written regexes in Python; gitleaks ships roughly
+  // 200 rules plus entropy scoring and keeps them current.
+  //
+  // Path notes, both of which have bitten this repository's ancestors:
+  //   1. Forward slashes only. Every agent runs a hook command through a POSIX
+  //      shell, which eats a backslash as an escape character, so a Windows
+  //      path arrives at node as one unbroken string and the hook never runs.
+  //   2. The path is relative to the project root, not absolute, so a fork
+  //      never has to edit it. Claude Code also expands ${CLAUDE_PROJECT_DIR}
+  //      here, but that variable means nothing to the other targets.
+  //
+  // The command is one inline string. Claude Code's schema does accept a
+  // sibling "args" array, but that is exec form and spawns `command` directly
+  // as an executable with no shell, which is not what a `node <script>` line
+  // wants. An earlier version of this repository put "node" in "command" and
+  // the script path in "args" while claiming to be shell form. Keep everything
+  // in the one string.
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        // Matches the file-writing tools only. Bash is left out deliberately:
+        // scanning every shell command costs a gitleaks spawn per command, and
+        // the commit-time gitleaks run under Trunk is the backstop for anything
+        // a shell redirect writes.
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "type": "command",
+        "timeout": 15,
+        "command": "node .rulesync/hooks/deny-secret-in-write.mjs",
+      },
+    ],
+  },
+
+  // Copilot and Cline register preToolUse hooks but have no matcher on them,
+  // so rulesync drops the entry above for those two rather than silently
+  // widening it. These override blocks put the same hook back without a
+  // matcher, which means it fires on every tool call there. That is cheap: the
+  // script exits 0 within milliseconds when the payload carries no `content`,
+  // `new_string`, or `edits`, which is every non-write tool.
+  "copilot": {
+    "hooks": {
+      "preToolUse": [
+        { "type": "command", "timeout": 15, "command": "node .rulesync/hooks/deny-secret-in-write.mjs" },
+      ],
+    },
+  },
+  "cline": {
+    "hooks": {
+      "preToolUse": [
+        { "type": "command", "timeout": 15, "command": "node .rulesync/hooks/deny-secret-in-write.mjs" },
+      ],
+    },
+  },
+}

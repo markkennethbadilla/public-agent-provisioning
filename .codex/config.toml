@@ -1,0 +1,28 @@
+default_permissions = "rulesync"
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+
+[permissions.rulesync]
+extends = ":workspace"
+
+[permissions.rulesync.filesystem]
+":minimal" = "read"
+glob_scan_max_depth = 8
+
+[permissions.rulesync.filesystem.":workspace_roots"]
+".env" = "deny"
+".env.*" = "deny"
+"**/.env" = "deny"
+"**/.env.*" = "deny"
+"**/credentials/**" = "deny"
+"**/secrets/**" = "deny"
+"**/.aws/**" = "deny"
+"**/.ssh/**" = "deny"
+"**/*.pem" = "deny"
+"**/*.p12" = "deny"
+"**/id_rsa*" = "deny"
+"**/id_ed25519*" = "deny"
+"**/.npmrc" = "deny"
+"**/.pypirc" = "deny"
+"**/.netrc" = "deny"
+".git/**" = "write"

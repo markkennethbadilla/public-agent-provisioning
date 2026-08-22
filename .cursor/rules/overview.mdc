@@ -1,3 +1,8 @@
+---
+description: Always-on operating rules for every AI coding agent working in this repository.
+globs: **/*
+---
+
 # Always-on rules
 
 This file is generated. Edit `.rulesync/rules/overview.md` and run

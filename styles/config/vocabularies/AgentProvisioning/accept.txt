@@ -1,0 +1,67 @@
+# Terms Vale's spell check must accept. One regex per line, case sensitive.
+# Add a term here rather than rewording correct prose around it.
+
+# Tools this template composes
+[Rr]ulesync
+[Gg]itleaks
+Trunk
+osv-scanner
+actionlint
+[Ss]hellcheck
+Vale
+Renovate
+Dependabot
+Corepack
+markdownlint
+reviewdog
+Mermaid
+Quarto
+
+# Agent platforms and their config surfaces
+Anthropic
+Claude
+Codex
+Copilot
+Cursor
+Cline
+Roo
+Windsurf
+Kiro
+AGENTS\.md
+CLAUDE\.md
+PreToolUse
+PostToolUse
+[Ss]ubagents?
+
+# Words Google's style package does not carry
+forkable
+worktrees?
+subtrees?
+pseudocode
+stdin
+stdout
+stderr
+cutover
+[Hh]and-roll(ed|ing|s)?
+lockfile
+repo
+repos
+[Mm]onorepo
+config
+configs
+YAGNI
+CVEs?
+
+# Terms the new rulesync sources use. Google's package does not carry them and
+# each is the correct spelling for its domain, so they are accepted, not reworded.
+npm
+[Hh]ardcode(d|s)?
+zod
+pydantic
+[Uu]nvalidated
+[Tt]ypecheck(ing|s)?
+[Rr]ebase(d|s)?
+[Bb]ackfill(ed|ing|s)?
+[Tt]eardown
+toolkits?
+else's

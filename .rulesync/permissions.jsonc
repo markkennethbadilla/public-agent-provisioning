@@ -1,0 +1,111 @@
+{
+  "$schema": "https://github.com/dyoshikawa/rulesync/releases/latest/download/permissions-schema.json",
+
+  // Safe by default. A template a stranger clones has to assume the stranger
+  // has not read it yet, so the first run is restrictive and loosening it is a
+  // deliberate edit.
+  //
+  // Canonical shape is lowercase category, then glob pattern, then one of
+  // allow / ask / deny. rulesync translates it per agent, so for Claude Code
+  // `"rm -rf *": "deny"` under `bash` becomes `Bash(rm -rf *)` in the
+  // settings.json deny array. Do not write the agent-native form here.
+  //
+  // deny beats ask beats allow wherever two rules overlap.
+  "permission": {
+    // These are the reads the deleted Python hook layer was trying to catch,
+    // handled at the permission boundary instead, where the agent cannot
+    // negotiate with it. A credential the agent never read cannot be pasted
+    // into a file, a log line, or a prompt sent to a model provider.
+    "read": {
+      ".env": "deny",
+      ".env.*": "deny",
+      "**/.env": "deny",
+      "**/.env.*": "deny",
+      "**/credentials/**": "deny",
+      "**/secrets/**": "deny",
+      "**/.aws/**": "deny",
+      "**/.ssh/**": "deny",
+      "**/*.pem": "deny",
+      "**/*.p12": "deny",
+      "**/id_rsa*": "deny",
+      "**/id_ed25519*": "deny",
+      "**/.npmrc": "deny",
+      "**/.pypirc": "deny",
+      "**/.netrc": "deny",
+    },
+
+    // Same paths again on the write side. Denying the read but allowing the
+    // write leaves the vault overwritable, which is the more expensive failure
+    // of the two because there is no undo.
+    "edit": {
+      ".env": "deny",
+      "**/.env": "deny",
+      "**/credentials/**": "deny",
+      "**/secrets/**": "deny",
+      "**/.ssh/**": "deny",
+    },
+
+    "bash": {
+      // Unrecoverable deletes. The old hand-written shell tokenizer that tried
+      // to catch these admitted in its own docstring that it was not
+      // exhaustive. This is not exhaustive either, which is why the fallback
+      // below is `ask` rather than `allow`.
+      "rm -rf *": "deny",
+      "rm -fr *": "deny",
+      "rm -r *": "deny",
+
+      // History rewrites on a pushed branch. Nothing here can restore a commit
+      // a collaborator already pulled. GitHub branch protection is the real
+      // enforcement; this stops the local attempt.
+      "git push --force*": "deny",
+      "git push -f*": "deny",
+      "git reset --hard*": "deny",
+      "git clean -*": "deny",
+
+      // Bypassing the commit and push guards Trunk installs. If a guard is
+      // wrong, fix the guard.
+      "git commit *--no-verify*": "deny",
+      "git push *--no-verify*": "deny",
+
+      // Piping a downloaded script straight into a shell executes code nobody
+      // read, including whatever the host serves next week.
+      "curl *|*sh*": "deny",
+      "wget *|*sh*": "deny",
+
+      // Everything else asks once. A fork that trusts its own toolchain should
+      // add allow entries for what it runs constantly (`git status`,
+      // `npm test`, `npx rulesync *`) rather than flipping this to allow.
+      "*": "ask",
+    },
+  },
+
+  // Cline has no `ask` action, so rulesync translates every `ask` into `deny`
+  // to fail closed. Applied to the `*` catch-all above that denies every shell
+  // command and leaves Cline unable to run anything. This block replaces the
+  // shared `bash` category for Cline with the same denies minus the catch-all.
+  // Cline also enforces shell commands only, so it ignores `read` and `edit`
+  // either way; the tool-call hook is what covers file writes there.
+  "cline": {
+    "permission": {
+      "bash": {
+        "rm -rf *": "deny",
+        "rm -fr *": "deny",
+        "rm -r *": "deny",
+        "git push --force*": "deny",
+        "git push -f*": "deny",
+        "git reset --hard*": "deny",
+        "git clean -*": "deny",
+        "git commit *--no-verify*": "deny",
+        "git push *--no-verify*": "deny",
+        "curl *|*sh*": "deny",
+        "wget *|*sh*": "deny",
+      },
+    },
+  },
+
+  // Two limits worth knowing rather than discovering later.
+  //   Codex CLI accepts read/edit/write/webfetch only, so none of the `bash`
+  //   denies above reach it. Codex sandboxing is the layer that covers that.
+  //   Cursor CLI has no `ask` action, so its `*` catch-all is dropped and only
+  //   the explicit denies apply there.
+}

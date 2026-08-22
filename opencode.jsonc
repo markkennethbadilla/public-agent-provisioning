@@ -1,0 +1,42 @@
+{
+  "permission": {
+    "read": {
+      ".env": "deny",
+      ".env.*": "deny",
+      "**/.env": "deny",
+      "**/.env.*": "deny",
+      "**/credentials/**": "deny",
+      "**/secrets/**": "deny",
+      "**/.aws/**": "deny",
+      "**/.ssh/**": "deny",
+      "**/*.pem": "deny",
+      "**/*.p12": "deny",
+      "**/id_rsa*": "deny",
+      "**/id_ed25519*": "deny",
+      "**/.npmrc": "deny",
+      "**/.pypirc": "deny",
+      "**/.netrc": "deny"
+    },
+    "edit": {
+      ".env": "deny",
+      "**/.env": "deny",
+      "**/credentials/**": "deny",
+      "**/secrets/**": "deny",
+      "**/.ssh/**": "deny"
+    },
+    "bash": {
+      "rm -rf *": "deny",
+      "rm -fr *": "deny",
+      "rm -r *": "deny",
+      "git push --force*": "deny",
+      "git push -f*": "deny",
+      "git reset --hard*": "deny",
+      "git clean -*": "deny",
+      "git commit *--no-verify*": "deny",
+      "git push *--no-verify*": "deny",
+      "curl *|*sh*": "deny",
+      "wget *|*sh*": "deny",
+      "*": "ask"
+    }
+  }
+}
