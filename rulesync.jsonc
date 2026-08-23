@@ -2,8 +2,10 @@
   "$schema": "https://github.com/dyoshikawa/rulesync/releases/latest/download/config-schema.json",
 
   // rulesync is the single generator for this template. Everything an agent
-  // reads (rules, skills, hooks, permissions) is written from `.rulesync/`.
-  // Never hand-edit a generated file. Edit the source here and regenerate:
+  // reads (rules, skills, hooks, permissions, MCP servers) is written from
+  // `.rulesync/`. Never hand-edit a generated file. Edit the source here and
+  // regenerate:
+  //   npx rulesync install    # fetch the pinned skill sources (once, and after a pin bump)
   //   npx rulesync generate
   //
   // `targets` uses the object form, which pairs each tool with exactly the
@@ -12,17 +14,21 @@
   // its way through the ones a tool cannot express. The object form and a
   // top-level `features` key cannot both be set; the loader rejects that.
   //
-  // Target names below are the legal `--targets` values for rulesync 16.12.0,
+  // Target names below are the legal `--targets` values for rulesync 16.14.0,
   // checked against `npx rulesync docs reference/supported-tools`. An invalid
   // name is not an error. rulesync writes nothing for it and moves on, so a
   // typo here looks exactly like a working config that produced no files.
   //
   // Feature support per tool is from the same table. `agentsmd` supports rules
-  // only, which is why it is the one target with a single entry.
+  // only, which is why it is the one target with a single entry. `cline`
+  // supports mcp only from a `--global` generate, which writes into the user's
+  // home rather than this repository, so it is left off here; run
+  // `npx rulesync generate --global --features mcp --targets cline` yourself
+  // if you use Cline and want the servers.
   "targets": {
     // Anthropic Claude Code. Writes CLAUDE.md, .claude/skills/,
-    // .claude/settings.json (hooks + permissions).
-    "claudecode": ["rules", "skills", "hooks", "permissions"],
+    // .claude/settings.json (hooks + permissions), .mcp.json.
+    "claudecode": ["rules", "skills", "hooks", "permissions", "mcp"],
 
     // The plain AGENTS.md standard (https://agents.md). No tool of its own.
     // Many agents read this file when they have no format of their own, so it
@@ -30,20 +36,25 @@
     "agentsmd": ["rules"],
 
     // OpenAI Codex CLI. Also writes the root AGENTS.md, which is the same file
-    // `agentsmd` writes and the same content, so the two do not fight.
-    "codexcli": ["rules", "skills", "hooks", "permissions"],
+    // `agentsmd` writes and the same content, so the two do not fight. MCP
+    // servers land in .codex/config.toml.
+    "codexcli": ["rules", "skills", "hooks", "permissions", "mcp"],
 
-    // Cursor. Writes .cursor/rules/, .cursor/hooks.json, .cursor/skills/.
-    "cursor": ["rules", "skills", "hooks", "permissions"],
+    // Cursor. Writes .cursor/rules/, .cursor/hooks.json, .cursor/skills/,
+    // .cursor/mcp.json.
+    "cursor": ["rules", "skills", "hooks", "permissions", "mcp"],
 
-    // GitHub Copilot. Writes .github/copilot-instructions.md.
-    "copilot": ["rules", "skills", "hooks", "permissions"],
+    // GitHub Copilot in VS Code. Writes .github/copilot-instructions.md and
+    // .vscode/mcp.json.
+    "copilot": ["rules", "skills", "hooks", "permissions", "mcp"],
 
     // OpenCode. Bring-your-own-model, so it is the target a forker uses when
-    // they are not on any vendor subscription.
-    "opencode": ["rules", "skills", "hooks", "permissions"],
+    // they are not on any vendor subscription. MCP servers land in
+    // opencode.jsonc.
+    "opencode": ["rules", "skills", "hooks", "permissions", "mcp"],
 
-    // Cline. VS Code extension, large install base.
+    // Cline. VS Code extension, large install base. No "mcp" here; see the
+    // note above the targets block.
     "cline": ["rules", "skills", "hooks", "permissions"],
   },
 
@@ -60,8 +71,74 @@
   "verbose": false,
   "silent": false,
 
-  // No `sources` block on purpose. `sources` pins rule and skill packages from
-  // other people's repositories, which is a good idea in a working repository
-  // and a bad default in a template. A fork should choose its own pins rather
-  // than inherit someone else's taste. Add them with `npx rulesync add <source>`.
+  // Pinned community skill packages. `npx rulesync install` fetches them into
+  // `.rulesync/skills/.curated/` (gitignored) and records the resolved commit
+  // plus per-skill integrity hashes in `rulesync.lock` (committed). CI installs
+  // with `--frozen`, so a fork gets byte-for-byte what these pins name. Bump
+  // pins with `npx rulesync install --update`, then read the diff.
+  //
+  // Every source below is listed skill-by-skill on purpose. The whole-source
+  // form (`{ "source": "owner/repo@tag" }`) also works, but then a tag bump
+  // silently grows the set, and an unread skill in an agent's head is an
+  // unread instruction.
+  "sources": [
+    {
+      // General engineering skills. MIT. Tag 0.6.7 is the newest release
+      // (2026-08-14), verified to contain every name below.
+      "source": "addyosmani/agent-skills@0.6.7",
+      "skills": [
+        "api-and-interface-design",
+        "browser-testing-with-devtools",
+        "ci-cd-and-automation",
+        "code-review-and-quality",
+        "code-simplification",
+        "context-engineering",
+        "debugging-and-error-recovery",
+        "deprecation-and-migration",
+        "documentation-and-adrs",
+        "doubt-driven-development",
+        "frontend-ui-engineering",
+        "git-workflow-and-versioning",
+        "idea-refine",
+        "incremental-implementation",
+        "interview-me",
+        "observability-and-instrumentation",
+        "performance-optimization",
+        "planning-and-task-breakdown",
+        "security-and-hardening",
+        "shipping-and-launch",
+        "source-driven-development",
+        "spec-driven-development",
+        "test-driven-development",
+        "using-agent-skills"
+      ]
+    },
+    {
+      // Anthropic's official skills. Apache-2.0 per skill (the repository has
+      // no top-level license, so re-check LICENSE.txt before adding a sixth).
+      // Upstream ships no releases or tags, so the pin is the main-branch
+      // commit SHA as of 2026-08-21.
+      "source": "anthropics/skills@3b3fad96af16a10759d930941b4520ba0c40edae",
+      "skills": [
+        "skill-creator",
+        "mcp-builder",
+        "claude-api",
+        "webapp-testing",
+        "frontend-design"
+      ]
+    },
+    {
+      // Official Vale agent skills, from the vendor's own org. MIT. The pinned
+      // SHA is HEAD of main (2026-08-05). These are what let an agent set up
+      // and fix Vale instead of guessing at prose style.
+      "source": "vale-cli/agent-tools@dcef76fe3ee6173aa2dcfcc406fc1232bd3433a8",
+      "skills": [
+        "setup",
+        "fix",
+        "triage",
+        "vocab",
+        "ci"
+      ]
+    }
+  ]
 }

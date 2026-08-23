@@ -57,6 +57,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Fetch the pinned community skill sources exactly as rulesync.lock
+      # records them. --frozen fails instead of re-resolving, so a pin edited
+      # without an `install --update` goes red here rather than drifting.
+      - run: npx rulesync install --frozen
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npx rulesync generate --check
 
   # node:test from the Node standard library, no test framework installed. Each
@@ -71,4 +77,17 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: node --test
+      # The hook command is gitleaks itself and fails open when the binary is
+      # missing, so the suite hard-fails without it. Same pinned version Trunk
+      # runs at commit time (.trunk/trunk.yaml).
+      - name: Install gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar -xz gitleaks
+          sudo install gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+      # npm test, not a bare node --test: the git-guard tests spawn `trunk`,
+      # which lives in node_modules/.bin via the pinned @trunkio/launcher
+      # devDependency, and only an npm script puts that directory on PATH.
+      # A bare node --test on a runner with no global Trunk fails the fixture,
+      # which is exactly what happened to the first fork.
+      - run: npm test

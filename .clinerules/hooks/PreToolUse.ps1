@@ -11,7 +11,7 @@ $cancel = $false
 $errorMessage = ''
 
 if (-not $cancel) {
-  $hookStderr = ($payload | & cmd /c 'node .rulesync/hooks/deny-secret-in-write.mjs' 2>&1 | Out-String)
+  $hookStderr = ($payload | & cmd /c 'gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2' 2>&1 | Out-String)
   $hookStatus = $LASTEXITCODE
   if ($hookStatus -eq 2) {
     $cancel = $true

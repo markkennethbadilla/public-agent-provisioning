@@ -65,3 +65,11 @@ pydantic
 [Tt]eardown
 toolkits?
 else's
+
+# Terms this template uses as ordinary technical vocabulary
+[Uu]nscoped
+[Uu]nscanned
+[Vv]endored
+[Gg]itignored
+[Dd]evDependency
+[Dd]evDependencies

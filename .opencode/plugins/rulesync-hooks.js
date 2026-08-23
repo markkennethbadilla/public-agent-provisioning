@@ -4,7 +4,7 @@ export const RulesyncHooksPlugin = async ({ $ }) => {
       {
         const __re = new RegExp("Write|Edit|MultiEdit|NotebookEdit");
         if (__re.test(input.tool)) {
-          await $`node .rulesync/hooks/deny-secret-in-write.mjs`;
+          await $`gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2`;
         }
       }
     },

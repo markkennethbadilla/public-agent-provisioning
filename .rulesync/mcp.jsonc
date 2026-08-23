@@ -1,0 +1,44 @@
+{
+  "$schema": "https://github.com/dyoshikawa/rulesync/releases/latest/download/mcp-schema.json",
+
+  // MCP servers, declared once and written into each agent's native format:
+  // .mcp.json (Claude Code), .codex/config.toml (Codex CLI), .cursor/mcp.json
+  // (Cursor), .vscode/mcp.json (Copilot), opencode.jsonc (OpenCode). Each
+  // agent spawns its own copy of each server on demand; nothing here runs
+  // until an agent asks for a tool.
+  //
+  // Both entries launch through npx, so the only prerequisite is Node. The
+  // first cold start of each downloads the package, which takes a moment; if
+  // you install a server globally, point `command` at the installed binary
+  // instead and the download disappears.
+  //
+  // To keep a server away from some agents, add a per-server "targets" array
+  // using the same names as rulesync.jsonc, e.g. "targets": ["claudecode"].
+  "mcpServers": {
+    // Official Chrome DevTools MCP server, by the Chrome DevTools team
+    // (https://github.com/ChromeDevTools/chrome-devtools-mcp). Lets an agent
+    // drive a real Chrome: navigate, click, fill forms, screenshot, read the
+    // console and network. Needs Chrome installed. The vendor's own
+    // registration line is exactly this, with @latest on purpose: Chrome
+    // updates on the vendor's schedule and the server has to keep up with it.
+    // Google collects usage statistics by default; add
+    // "--no-usage-statistics" to args to opt out.
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    },
+
+    // OfficeCLI, by iOfficeAI (https://github.com/iOfficeAI/OfficeCLI).
+    // Apache-2.0. Reads and edits .docx, .xlsx, and .pptx through one
+    // command-string tool, with no Microsoft Office installed. The scoped
+    // package @officecli/officecli is the real one; the unscoped npm
+    // "officecli" is an unrelated project with no MCP server. The first run
+    // downloads a self-contained native binary. If OfficeCLI is already
+    // installed system-wide (winget/brew/scoop), swap this entry for
+    // "command": "officecli", "args": ["mcp"].
+    "officecli": {
+      "command": "npx",
+      "args": ["-y", "@officecli/officecli", "mcp"]
+    }
+  }
+}

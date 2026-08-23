@@ -34,8 +34,8 @@ trying to do the thing.
 
 | Guard | Maintained owner | Bad input, must be blocked | Good input, must pass |
 |---|---|---|---|
-| PreToolUse hook | rulesync declares it, gitleaks detects | A call to every tool the matcher names, carrying a live-shaped AWS key ID. Exit code must be 2 | The same call carrying an ordinary note. Exit code must be 0 |
-| Hook wiring | rulesync `.rulesync/hooks.jsonc` | A hook file no registration names, or a registration naming a file that is gone | Every hook on disk registered, every registration backed by a file |
+| PreToolUse hook | rulesync declares it, the command is gitleaks itself | A call to every tool the matcher names, carrying a live-shaped AWS key ID. Exit code must be 2 | The same call carrying an ordinary note. Exit code must be 0 |
+| Hook wiring | rulesync `.rulesync/hooks.jsonc` | A script file under `.rulesync/hooks/`, or a declared command that runs one—owned guard code is the regression this template exists to rule out. Also a missing `gitleaks` on `PATH`, because that is the state where the hook fails open | Commands that run maintained binaries only, with `gitleaks` present |
 | Commit guard | Trunk running gitleaks | `git commit` of a file holding the same key. Must exit non-zero and leave the change uncommitted | `git commit` of a clean file. Must exit 0 and move `HEAD` |
 | Push guard | Trunk running gitleaks | `git push` of a commit holding the same key, both to a remote with no refs at all and to one that already has the branch. Must exit non-zero and leave the remote ref where it was | `git push` of a clean commit. Must exit 0 and land the commit on the remote |
 | Generated file drift | `rulesync generate --check` | A generated `CLAUDE.md` edited by hand. Must exit 1 | Untouched output. Must exit 0 |
@@ -73,17 +73,21 @@ flowchart LR
 Every list in this suite comes out of the file that declares the thing, never
 out of an array somebody keeps up to date by hand.
 
-`hooks.test.mjs` reads `.rulesync/hooks/` for the hooks and the `matcher` in
-`.rulesync/hooks.jsonc` for the tools. Add either to a fork and it is exercised
-on the next run with no edit here. The suite also fails when the matcher names
-a tool it has no payload shape for, which is the only way to notice that the
-hook is registered for a tool whose text it never reads.
+`hooks.test.mjs` reads the `command` entries and the `matcher` out of
+`.rulesync/hooks.jsonc` and runs every declared command against every matched
+tool's real payload shape. Change either in a fork and it is exercised on the
+next run with no edit here. The suite also fails when the matcher names a tool
+it has no payload shape for, which is the only way to notice that the hook is
+registered for a tool whose text it never reads.
 
-That last case is not hypothetical. `NotebookEdit` carries its text in
-`new_source`, and it sat in the matcher while the hook script read `content`,
-`new_string` and `edits[].new_string`. Every notebook write was handed an empty
-string and allowed. Nothing caught it, because the test payload said `Write`
-and always had.
+That last case is not hypothetical. When this layer was still a wrapper
+script, `NotebookEdit` carried its text in `new_source` and sat in the matcher
+while the script read `content`, `new_string` and `edits[].new_string`. Every
+notebook write was handed an empty string and allowed. Nothing caught it,
+because the test payload said `Write` and always had. The wrapper is gone—the
+command is now `gitleaks` scanning the whole payload, so there is no field
+selection left to get wrong—and these per-tool pairs are what hold that
+claim to the contract shapes.
 
 The same shape is the worst bug this repository ever shipped: a pre-push check
 described in three separate documents that, in the script, evaluated a variable
@@ -92,10 +96,10 @@ maintained by hand, and the list said the check was covered. A list that agrees
 with the documentation instead of the code always agrees with the
 documentation.
 
-So the wiring tests assert both directions between the hook directory and the
-registration file. A hook nothing registers never runs. A registration pointing
-at a missing file fails open on some agent hosts and hard on others. Neither is
-visible from reading either file alone.
+So the wiring tests hold the zero-owned-code invariant in both directions. No
+script may exist under `.rulesync/hooks/`, and no declared command may run one.
+The moment a fork adds a wrapper script, the suite names it and says to wire a
+maintained binary instead.
 
 ## The git guards share one file on purpose
 
@@ -124,7 +128,12 @@ have set, and the same suite would give different answers on different laptops.
 ## Proving the suite can go red
 
 On 2026-08-22 the suite passed 23 of 23 against a fully wired guard set, and
-each new pair was then made to fail on purpose.
+each new pair was then made to fail on purpose. The hook rebuild on 2026-08-23
+repeated the exercise at 24 of 24: renaming the declared command to a
+nonexistent binary failed 9 of the 16 hook tests, every blocking pair among
+them, and planting a `.mjs` file back under `.rulesync/hooks/` failed the
+zero-owned-code assertion by name. Both edits were then reverted and the suite
+returned to green.
 
 The push action in `.trunk/trunk.yaml` went back to
 `--commit-ref-from-pre-push`, the flag that produced the empty range. The
@@ -133,14 +142,18 @@ empty-remote test failed with the message it was written to print, that
 remote holding no refs at all. Restoring `--all` returned the suite to green.
 
 `ApplyPatch` was then added to the matcher in `.rulesync/hooks.jsonc` without a
-payload shape to match. The suite came back 14 passed and 1 failed, naming the
-tool and both files that have to change. Removing it returned the suite to
+payload shape to match. Re-run against the rebuilt suite on 2026-08-23, the
+hook file came back 15 passed and 1 failed, the failure naming `ApplyPatch` as
+the tool with no shape to exercise it. Removing it returned the suite to
 green.
 
-Earlier the same day, `process.exit(0)` was inserted into the secret hook just
-before its `process.exit(2)`, reproducing the shape of the historical bug where
-a guard computes a finding and then does nothing with it. The bad half of the
-hook pair failed, as it should.
+Earlier the same day, while the hook was still a wrapper script,
+`process.exit(0)` was inserted into it just before its `process.exit(2)`,
+reproducing the shape of the historical bug where a guard computes a finding
+and then does nothing with it. The bad half of the hook pair failed, as it
+should. That wrapper no longer exists to sabotage, which is the point: the
+equivalent drill now is renaming `gitleaks` off `PATH` and watching the
+presence test go red.
 
 Do the same for any pair you add. A test you have only ever seen pass is a test
 you have not finished writing.
@@ -149,7 +162,7 @@ you have not finished writing.
 
 | File | Contents |
 |---|---|
-| `hooks.test.mjs` | PreToolUse hook pairs, one per tool in the matcher, and the wiring assertions |
+| `hooks.test.mjs` | PreToolUse pairs, one per tool in the matcher, run against every command declared in `hooks.jsonc`, plus the zero-owned-code and gitleaks-presence assertions |
 | `git-guards.test.mjs` | Real `git commit` and real `git push` against a Trunk-managed scratch repository |
 | `rulesync.test.mjs` | Drift detection, green on this repository, and red on a hand edit |
 | `lib/proc.mjs` | Spawn helper, plus the git configuration blindfold |

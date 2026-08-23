@@ -1,0 +1,19 @@
+{
+  "servers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ]
+    },
+    "officecli": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@officecli/officecli",
+        "mcp"
+      ]
+    }
+  }
+}

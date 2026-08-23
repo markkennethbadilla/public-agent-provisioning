@@ -14,8 +14,8 @@ cancel=false
 error_message=''
 
 if [ "$cancel" = false ]; then
-  if bash -n -c 'node .rulesync/hooks/deny-secret-in-write.mjs' 2>/dev/null; then
-    hook_stderr=$(printf '%s' "$payload" | bash -c 'node .rulesync/hooks/deny-secret-in-write.mjs' 2>&1 >/dev/null)
+  if bash -n -c 'gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2' 2>/dev/null; then
+    hook_stderr=$(printf '%s' "$payload" | bash -c 'gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2' 2>&1 >/dev/null)
     hook_status=$?
     if [ "$hook_status" -eq 2 ]; then
       cancel=true

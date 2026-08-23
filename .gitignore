@@ -9,6 +9,11 @@
 .trunk/plugins
 .trunk/tools
 
+# Curated skill copies fetched by `npx rulesync install` from the pinned
+# sources in rulesync.jsonc. rulesync.lock (committed) holds the resolved
+# commits and per-skill integrity hashes; the copies themselves are cache.
+.rulesync/skills/.curated/
+
 # Node
 node_modules/
 npm-debug.log*

@@ -38,5 +38,26 @@
       "wget *|*sh*": "deny",
       "*": "ask"
     }
+  },
+  "mcp": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ],
+      "enabled": true
+    },
+    "officecli": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@officecli/officecli",
+        "mcp"
+      ],
+      "enabled": true
+    }
   }
 }

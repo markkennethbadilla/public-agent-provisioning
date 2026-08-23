@@ -4,7 +4,7 @@
     "preToolUse": [
       {
         "type": "command",
-        "command": "node .rulesync/hooks/deny-secret-in-write.mjs",
+        "command": "gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2",
         "timeout": 15,
         "matcher": "Write|Edit|MultiEdit|NotebookEdit"
       }

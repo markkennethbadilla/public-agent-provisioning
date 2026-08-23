@@ -1,52 +1,53 @@
 // The PreToolUse hook layer.
 //
-// rulesync declares the hooks in .rulesync/hooks.jsonc and writes the
-// per-agent registration. The hook body shells out to gitleaks. These tests
-// never look inside the hook and never assert on its message text. They feed it
-// a real payload and read the real exit code, because exit code 2 is the only
-// thing that stops a tool call.
+// rulesync declares the hook in .rulesync/hooks.jsonc and writes the per-agent
+// registration. The hook is not a script this repository owns: the declared
+// command is gitleaks itself, scanning the tool call's JSON payload from
+// stdin. These tests read the command out of hooks.jsonc and run it exactly as
+// an agent host would — through a shell, payload on stdin — and assert on the
+// real exit code, because exit code 2 is the only thing that stops a tool
+// call.
 //
-// Nothing about the coverage here is typed out by hand. The hooks come from the
-// directory, and the tools come from the matcher in hooks.jsonc. A hook or a
-// tool a fork adds tomorrow is exercised the moment its declaration lands.
+// Nothing about the coverage here is typed out by hand. The commands and the
+// matcher both come from hooks.jsonc. A tool a fork adds to the matcher
+// tomorrow is exercised the moment its declaration lands, or the suite fails
+// telling you to add its payload shape.
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { sh } from "./lib/proc.mjs";
 import { CLEAN_CONTENT, LEAKY_CONTENT, REPO_ROOT } from "./lib/scratch.mjs";
 
-const HOOK_DIR = join(REPO_ROOT, ".rulesync", "hooks");
 const HOOKS_JSONC = join(REPO_ROOT, ".rulesync", "hooks.jsonc");
-
-const hookFiles = existsSync(HOOK_DIR) ? readdirSync(HOOK_DIR).filter((f) => f.endsWith(".mjs")) : [];
 const hooksSource = existsSync(HOOKS_JSONC) ? readFileSync(HOOKS_JSONC, "utf8") : "";
 
+// Every distinct command hooks.jsonc declares. The main entry and the
+// copilot/cline overrides deliberately share one command string, so this is
+// normally a set of one, but the suite exercises whatever is actually
+// declared rather than assuming.
+//
+// hooks.jsonc is JSONC, and this reads it with a regex rather than adding a
+// parser dependency for one field. A regex that stops matching fails loudly on
+// the first test below instead of quietly covering nothing.
+const COMMANDS = [...new Set([...hooksSource.matchAll(/"command"\s*:\s*"([^"]+)"/g)].map((m) => m[1]))];
+
 // The tools under test, read out of the matcher in hooks.jsonc rather than
-// listed here.
-//
-// This is the whole point of the file. hooks.jsonc is what decides which tools
-// the hook is registered for, so it is the only honest source for which tools
-// have to be exercised. When a hand-picked array said "Write" and the matcher
-// said "Write|Edit|MultiEdit|NotebookEdit", the hook was registered for
-// NotebookEdit while reading a payload key NotebookEdit does not carry, was
-// handed an empty string, and allowed every notebook write through. The suite
-// stayed green because it had never once asked the matcher what it covered.
-// That is the same defect as this repository's old pre-push check, which was
-// documented in three places and was a no-op in the shipped script.
-//
-// hooks.jsonc is JSONC, and this reads it with the same regex approach the
-// wiring tests below already use on it rather than adding a parser dependency
-// for two fields. A regex that stops matching fails loudly on the first test in
-// this suite instead of quietly covering nothing.
+// listed here. When a hand-picked array said "Write" and the matcher said
+// "Write|Edit|MultiEdit|NotebookEdit", an earlier version of this layer was
+// registered for NotebookEdit while reading a payload key NotebookEdit does
+// not carry, and allowed every notebook write through. The suite stayed green
+// because it had never once asked the matcher what it covered.
 const MATCHED_TOOLS = [
   ...new Set([...hooksSource.matchAll(/"matcher"\s*:\s*"([^"]+)"/g)].flatMap((m) => m[1].split("|"))),
 ];
 
-// The payload key each tool carries its text in. They deliberately do not share
-// a name, which is exactly how a hook ends up registered for a tool it reads
-// nothing from. Shapes are from the agent hook contracts:
-// https://code.claude.com/docs/en/hooks
+// The payload key each tool carries its text in. They deliberately do not
+// share a name. The declared command scans the whole JSON payload, so no
+// per-key extraction exists to get wrong any more — these shapes exist so the
+// suite proves that claim against every registered tool's real shape. From the
+// agent hook contracts: https://code.claude.com/docs/en/hooks
 const TOOL_INPUT = {
   Write: (text) => ({ file_path: "deploy-notes.md", content: text }),
   Edit: (text) => ({ file_path: "deploy-notes.md", old_string: "placeholder", new_string: text }),
@@ -69,15 +70,35 @@ function payload(tool, text) {
   });
 }
 
-function runHook(file, input) {
-  return sh(process.execPath, [join(HOOK_DIR, file)], { input, cwd: REPO_ROOT });
+// Run a declared hook command the way an agent host does: one command string,
+// through a shell, payload on stdin. `shell: true` resolves to /bin/sh on
+// POSIX and cmd.exe on Windows; the declared command sticks to syntax both
+// accept (`1>&2` included), and this test is what holds it to that.
+function runCommand(command, input) {
+  const r = spawnSync(command, { shell: true, input, encoding: "utf8", windowsHide: true, cwd: REPO_ROOT });
+  if (r.error) return { code: -1, out: "", err: String(r.error.message || r.error) };
+  return { code: r.status ?? -1, out: r.stdout ?? "", err: r.stderr ?? "" };
 }
 
-describe("PreToolUse hooks", () => {
-  it("at least one hook exists to exercise", () => {
+describe("PreToolUse hook command", () => {
+  it("hooks.jsonc declares at least one command", () => {
     assert.ok(
-      hookFiles.length > 0,
-      `no *.mjs hook found in ${HOOK_DIR}. The rules and skills layers can be read past, but a hook is the only layer that can refuse a tool call, so an empty hook directory means nothing is enforced at all.`,
+      COMMANDS.length > 0,
+      `no "command" value could be read out of ${HOOKS_JSONC}. The rules and skills layers can be read past, but a hook is the only layer that can refuse a tool call, so an empty declaration means nothing is enforced at all.`,
+    );
+  });
+
+  // The declared command fails OPEN when its binary is missing: a shell that
+  // cannot find gitleaks exits 127, and the agent host reads any exit other
+  // than 2 as "allow". This test is the named mitigation for that trade — a
+  // machine without gitleaks cannot pass `npm run verify`, and CI installs it
+  // before running this suite.
+  it("gitleaks is on PATH, because the hook fails open without it", () => {
+    const r = sh("gitleaks", ["version"]);
+    assert.equal(
+      r.code,
+      0,
+      `\`gitleaks version\` did not run (${r.err.trim() || "not found"}). The hook command exits 127 without it and every agent write goes through unscanned. Install it: winget install Gitleaks.Gitleaks / brew install gitleaks / https://github.com/gitleaks/gitleaks/releases`,
     );
   });
 
@@ -97,19 +118,23 @@ describe("PreToolUse hooks", () => {
     assert.deepEqual(
       missing,
       [],
-      `the matcher in hooks.jsonc registers the hook for ${missing.join(", ")}, and this suite has no payload shape for that tool, so nothing here has ever run the hook against one. Add its tool_input shape to TOOL_INPUT in this file, and add the key that shape carries its text in to the key list in .rulesync/hooks/deny-secret-in-write.mjs. A tool in the matcher that the hook script reads no key for is allowed through every time, silently.`,
+      `the matcher in hooks.jsonc registers the hook for ${missing.join(", ")}, and this suite has no payload shape for that tool, so nothing here has ever run the hook against one. Add its tool_input shape to TOOL_INPUT in this file.`,
     );
   });
 
-  // The bad half of the pair, once per tool the matcher claims to cover. A
-  // guard that never fires is theatre, and it is theatre per tool.
+  // The bad half of the pair, once per tool the matcher claims to cover and
+  // once per declared command. A guard that never fires is theatre, and it is
+  // theatre per tool.
   for (const tool of TESTABLE_TOOLS) {
     it(`${tool}: blocks a call carrying a credential, with exit code 2`, () => {
-      const blocking = hookFiles.filter((f) => runHook(f, payload(tool, LEAKY_CONTENT)).code === 2);
-      assert.ok(
-        blocking.length > 0,
-        `a ${tool} payload containing a live-shaped AWS key ID reached the tool unblocked. hooks.jsonc registers the hook for ${tool}, so this is a registration that reads nothing from the payload it was given. Hooks tried: ${hookFiles.join(", ") || "(none)"}.`,
-      );
+      for (const command of COMMANDS) {
+        const r = runCommand(command, payload(tool, LEAKY_CONTENT));
+        assert.equal(
+          r.code,
+          2,
+          `a ${tool} payload containing a live-shaped AWS key ID reached the tool unblocked (exit ${r.code}). hooks.jsonc registers this command for ${tool}: ${command}\nstderr: ${r.err}`,
+        );
+      }
     });
   }
 
@@ -117,53 +142,59 @@ describe("PreToolUse hooks", () => {
   // learn to switch off, which is worse than no guard at all.
   for (const tool of TESTABLE_TOOLS) {
     it(`${tool}: allows an ordinary call`, () => {
-      for (const file of hookFiles) {
-        const r = runHook(file, payload(tool, CLEAN_CONTENT));
+      for (const command of COMMANDS) {
+        const r = runCommand(command, payload(tool, CLEAN_CONTENT));
         assert.equal(
           r.code,
           0,
-          `${file} blocked a benign ${tool}. That is a false positive, and a false positive is what teaches people to disable the hook.\nstderr: ${r.err}`,
+          `the hook blocked a benign ${tool}. That is a false positive, and a false positive is what teaches people to disable the hook.\ncommand: ${command}\nstderr: ${r.err}`,
         );
       }
     });
   }
 
+  it("the redacted refusal names the rule that fired, never the secret", () => {
+    for (const command of COMMANDS) {
+      const r = runCommand(command, payload(TESTABLE_TOOLS[0] ?? "Write", LEAKY_CONTENT));
+      const text = r.out + r.err;
+      assert.ok(
+        !text.includes(LEAKY_CONTENT.match(/AKIA\w+/)[0]),
+        `the refusal printed the planted secret itself. The --redact flag is missing or broken in: ${command}`,
+      );
+    }
+  });
+
   it("ignores a payload it does not understand instead of blocking it", () => {
-    for (const file of hookFiles) {
-      const r = runHook(file, "not json at all");
-      assert.equal(r.code, 0, `${file} blocked on unparseable input. Every tool call would fail.\nstderr: ${r.err}`);
+    for (const command of COMMANDS) {
+      const r = runCommand(command, "not json at all");
+      assert.equal(r.code, 0, `the hook blocked on unparseable input. Every tool call would fail.\ncommand: ${command}\nstderr: ${r.err}`);
     }
   });
 });
 
-// The regression test for this repository's worst historical bug. A pre-push
-// check was described in three separate documents and was, in the shipped
-// script, a single line that evaluated a variable and did nothing with it. It
-// stayed broken because coverage was a hand-picked list rather than something
-// read from the files that declare the guards.
-//
-// Both directions matter. A hook file nothing registers never runs. A
-// registration pointing at a missing file fails open on some agents and hard on
-// others.
+// The invariant this version of the repository added: the hook layer owns no
+// code. The command in hooks.jsonc is the vendor's own binary, so there is no
+// script here whose field-extraction, exit-code mapping, or JSON parsing can
+// rot. This test is what turns that from a README claim into something CI
+// enforces.
 describe("hook wiring", () => {
   it("hooks.jsonc exists", () => {
     assert.ok(existsSync(HOOKS_JSONC), `${HOOKS_JSONC} is missing, so nothing registers any hook with any agent.`);
   });
 
-  it("every hook file on disk is referenced by hooks.jsonc", () => {
-    for (const file of hookFiles) {
+  it("no owned hook script exists — the declared commands run maintained binaries only", () => {
+    const hookDir = join(REPO_ROOT, ".rulesync", "hooks");
+    const stray = existsSync(hookDir) ? readdirSync(hookDir) : [];
+    assert.deepEqual(
+      stray,
+      [],
+      `.rulesync/hooks/ holds ${stray.join(", ")}. This repository's hook layer is configuration only; a script there is owned guard code, which is the thing this template exists to avoid. Wire a maintained binary in hooks.jsonc instead.`,
+    );
+    for (const command of COMMANDS) {
       assert.ok(
-        hooksSource.includes(file),
-        `.rulesync/hooks/${file} exists but hooks.jsonc never names it, so no agent runs it. Dead code that reads like protection.`,
+        !/\.(mjs|cjs|js|py|sh|ps1)\b/.test(command),
+        `hooks.jsonc declares "${command}", which runs a script file. The hook layer is configuration pointing at maintained binaries; a script is owned code.`,
       );
-    }
-  });
-
-  it("every hook path named in hooks.jsonc exists on disk", () => {
-    const referenced = [...hooksSource.matchAll(/[\w./-]*\.rulesync\/hooks\/([\w.-]+\.mjs)/g)].map((m) => m[1]);
-    assert.ok(referenced.length > 0, "hooks.jsonc names no hook script under .rulesync/hooks/.");
-    for (const name of new Set(referenced)) {
-      assert.ok(existsSync(join(HOOK_DIR, name)), `hooks.jsonc points at .rulesync/hooks/${name}, which does not exist.`);
     }
   });
 });

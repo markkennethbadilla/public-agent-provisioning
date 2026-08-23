@@ -48,6 +48,22 @@ lint:
         - node_modules/**
         # `vale sync` output, refreshed on every run and owned by errata-ai.
         - styles/**
+        # Community skills: the gitignored cache `rulesync install` fetches,
+        # and the generated per-agent copies of the same content. They are
+        # other people's repositories, pinned by commit and integrity hash in
+        # rulesync.lock. Linting them here reports findings nobody in this
+        # repository can fix — the first `trunk check --all` after adding the
+        # skill sources flagged 48 CVEs in one skill's bundled example
+        # lockfiles. Vale scopes these same paths out in .vale.ini for the
+        # same reason. The two example skills under .rulesync/skills/ remain
+        # linted, because those are this repository's own.
+        - .rulesync/skills/.curated/**
+        - .agents/skills/**
+        - .claude/skills/**
+        - .cline/skills/**
+        - .cursor/skills/**
+        - .github/skills/**
+        - .opencode/skills/**
 
 # Trunk's stock pre-commit actions FIND a secret and then let it through.
 #

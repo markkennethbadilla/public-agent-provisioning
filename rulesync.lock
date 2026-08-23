@@ -1,0 +1,128 @@
+{
+  "lockfileVersion": 1,
+  "sources": {
+    "addyosmani/agent-skills@0.6.7": {
+      "requestedRef": "0.6.7",
+      "resolvedRef": "df1edb2e05487d0aa6d93c747141e0aed1187f25",
+      "resolvedAt": "2026-08-23T12:43:40.477Z",
+      "skills": {
+        "api-and-interface-design": {
+          "integrity": "sha256-b2fa57f7326e3b17ce2a902e9f0e6ab7d581502411e4b063f68bf193690f901e"
+        },
+        "browser-testing-with-devtools": {
+          "integrity": "sha256-73640726c8afa212289ca2fb1dfaa2f73eec968d717b1f78448a4fd74d717272"
+        },
+        "ci-cd-and-automation": {
+          "integrity": "sha256-706d42c02e056cfd0509172fa294ecbdec8509aac9dc25862310800892709d9d"
+        },
+        "code-review-and-quality": {
+          "integrity": "sha256-57574227c803c4a1a5132ff44ecd9c3110cfa96290e89204459b8f3441a0b463"
+        },
+        "code-simplification": {
+          "integrity": "sha256-a6d4aba8358a46634487e1c4b612cd021a41f3227fbe0b131270e2ebaaea8440"
+        },
+        "context-engineering": {
+          "integrity": "sha256-cef1aaff58296275f7279284562b7501483913628e09d1269dbb1e69e73240f4"
+        },
+        "debugging-and-error-recovery": {
+          "integrity": "sha256-78cadb32260105d619d7e47da6633cf47ed0d14f2857fcd7adee1ff1b8b3608c"
+        },
+        "deprecation-and-migration": {
+          "integrity": "sha256-e965a8acab9e6004749f0e70374cc9a5f7c1b3953d9e78e6e8aef8bdd3743f73"
+        },
+        "documentation-and-adrs": {
+          "integrity": "sha256-f6161596cab00499edc8b1512c46fdeda5f733ffa8403d377dd8c57dc9949eb3"
+        },
+        "doubt-driven-development": {
+          "integrity": "sha256-3141d5fdd8449ee5236098146744ac6e7641f2061c4fdf57f92421bb76fec1fd"
+        },
+        "frontend-ui-engineering": {
+          "integrity": "sha256-9850adcce7059f880c1169c4d10fcc5c50e54570ec44c5891407b4a80d4b0a22"
+        },
+        "git-workflow-and-versioning": {
+          "integrity": "sha256-584a72ac5669e474e5b1552a0ec704b95a03c4056965f80d8cf74aa22668af63"
+        },
+        "idea-refine": {
+          "integrity": "sha256-e462e20ed36d7a469c0a1326e3842542dd07ba61736e35fe231533182247ebf9"
+        },
+        "incremental-implementation": {
+          "integrity": "sha256-100e4d5820fae9bea04ab891b150c6c393805deeb0af2cfbabd9e200d3cb9275"
+        },
+        "interview-me": {
+          "integrity": "sha256-f271a5931d374e3ab970c79e0461a30b741123271519e599b5b9a29b8db2ffaf"
+        },
+        "observability-and-instrumentation": {
+          "integrity": "sha256-d2e377bfb770d1ad1d59542c814ddcc3a68e504183d560e6904d381a6c9aa760"
+        },
+        "performance-optimization": {
+          "integrity": "sha256-b14354a5fda4cdcec711dce9f9a8bd7c7288271fa0915e41ad1d2543e54ff9bd"
+        },
+        "planning-and-task-breakdown": {
+          "integrity": "sha256-995b7bffd6108169a417746a34f413dfdab46da2a790ad3eab6035c7d1fbaeb4"
+        },
+        "security-and-hardening": {
+          "integrity": "sha256-75cfb5af75bbb4a18070e301c6b491c9e4c86cdd3ea6765b8ef3b80e60bbf109"
+        },
+        "shipping-and-launch": {
+          "integrity": "sha256-e4b54cc5137f1a633a0dcc3d3ed477c2096e56e066312279e3da9cc940005251"
+        },
+        "source-driven-development": {
+          "integrity": "sha256-3c38fbf95b921c799a60d0310d396bb8767045243721a8004aaecbe3b04f5ac5"
+        },
+        "spec-driven-development": {
+          "integrity": "sha256-78280eeb6945cf6d041348b99fbbf6c2d73764ea551a0c9c9b15aa4630da17bb"
+        },
+        "test-driven-development": {
+          "integrity": "sha256-b966560774b72f18c84daf27fac9ef92bff93b79840a28140345b2a698d5037e"
+        },
+        "using-agent-skills": {
+          "integrity": "sha256-1a1905f2c608ad85fcb524bf376ed34f83d99b73347b850fe1b160aeb5e51187"
+        }
+      }
+    },
+    "anthropics/skills@3b3fad96af16a10759d930941b4520ba0c40edae": {
+      "requestedRef": "3b3fad96af16a10759d930941b4520ba0c40edae",
+      "resolvedRef": "3b3fad96af16a10759d930941b4520ba0c40edae",
+      "resolvedAt": "2026-08-23T12:44:37.020Z",
+      "skills": {
+        "claude-api": {
+          "integrity": "sha256-eae4ead7120ab89f8df7e1efa6836562d66908b60ca33eec36dd4ffce7d5af26"
+        },
+        "frontend-design": {
+          "integrity": "sha256-665c585455decbcb02116bc928adf5148b9cd0f67b7eb4908c8c0d647c00f68a"
+        },
+        "mcp-builder": {
+          "integrity": "sha256-46f45bf345f73cff0afd292053c96c83f0e3f18610924812de3eb45ff2904063"
+        },
+        "skill-creator": {
+          "integrity": "sha256-d3f99a0544bca333074f0e74289d3c44c049f49257fbcda36355c85bb314e268"
+        },
+        "webapp-testing": {
+          "integrity": "sha256-cfb23ef0c399c36e9247142a7ab5ac0e03c03e1c9f047b0f7502232a2c50b564"
+        }
+      }
+    },
+    "vale-cli/agent-tools@dcef76fe3ee6173aa2dcfcc406fc1232bd3433a8": {
+      "requestedRef": "dcef76fe3ee6173aa2dcfcc406fc1232bd3433a8",
+      "resolvedRef": "dcef76fe3ee6173aa2dcfcc406fc1232bd3433a8",
+      "resolvedAt": "2026-08-23T12:44:42.536Z",
+      "skills": {
+        "ci": {
+          "integrity": "sha256-fff4d9eca561800be74e2416a5091822d12725a09c068a330ccbc1be3a8d09e4"
+        },
+        "fix": {
+          "integrity": "sha256-52b0da7b1cd1ae2a2dcbebc7c371176d928896b4260cfaacba40f28bde674723"
+        },
+        "setup": {
+          "integrity": "sha256-78ece13a76b9e5af521bc0450366a0cf27561556a1b913100a86fa426029d5fa"
+        },
+        "triage": {
+          "integrity": "sha256-39fa0bf7a02990f8b3ffda93bcbfe1f996c41566e99f460a59cdcab0aea96c01"
+        },
+        "vocab": {
+          "integrity": "sha256-c2b4092382e15cccf95ed25fd8f03167d1f0584f050ee6562c1d0ec223ff317b"
+        }
+      }
+    }
+  }
+}

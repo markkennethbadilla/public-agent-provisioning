@@ -1,26 +1,56 @@
 {
-  // One hook. rulesync translates this single declaration into each agent's
-  // native hook registration, so nothing here is written into an agent's
-  // settings file by hand. Regenerate with `npx rulesync generate`.
+  // One hook, and it is one line of configuration. rulesync translates this
+  // single declaration into each agent's native hook registration, so nothing
+  // here is written into an agent's settings file by hand. Regenerate with
+  // `npx rulesync generate`.
   //
-  // The whole hook is 45 lines because gitleaks does the detecting. The layer
-  // this replaces was 15 hand-written regexes in Python; gitleaks ships roughly
-  // 200 rules plus entropy scoring and keeps them current.
+  // The command is gitleaks itself, unwrapped. The agent host pipes the tool
+  // call's JSON payload to the hook's stdin; gitleaks scans that raw JSON and
+  // exits 2 on a finding, which is the one exit code the host reads as "stop,
+  // do not run this tool call". The file content sits JSON-escaped inside the
+  // payload, and gitleaks' rules match straight through the escaping — a
+  // planted AWS key inside `content`, `new_string`, `new_source`, and
+  // `edits[].new_string` each exited 2 when this line was verified on
+  // 2026-08-23. Scanning the whole payload is what makes per-tool field
+  // extraction unnecessary, and it is why this repository's previous 66-line
+  // Node wrapper is deleted: the wrapper existed to pull those four fields
+  // out, and it once shipped silently ignoring one of them (NotebookEdit's
+  // new_source). A scan that never selects fields cannot repeat that bug.
   //
-  // Path notes, both of which have bitten this repository's ancestors:
-  //   1. Forward slashes only. Every agent runs a hook command through a POSIX
-  //      shell, which eats a backslash as an escape character, so a Windows
-  //      path arrives at node as one unbroken string and the hook never runs.
-  //   2. The path is relative to the project root, not absolute, so a fork
-  //      never has to edit it. Claude Code also expands ${CLAUDE_PROJECT_DIR}
-  //      here, but that variable means nothing to the other targets.
+  // Flag by flag:
+  //   stdin          scan standard input instead of a git repository
+  //   -v             print each finding, so the refusal names the rule that
+  //                  fired instead of a bare "leaks found: 1"
+  //   --no-color     plain text for the agent transcript
+  //   --no-banner    no startup banner
+  //   --redact       findings name the rule, never the secret itself
+  //                  (bare flag redacts 100 percent, its default)
+  //   --exit-code 2  a finding exits 2 (the default 1 would not block)
+  //   1>&2           findings print to stdout; the host shows the agent
+  //                  stderr on a blocked call, so route them there
   //
-  // The command is one inline string. Claude Code's schema does accept a
-  // sibling "args" array, but that is exec form and spawns `command` directly
-  // as an executable with no shell, which is not what a `node <script>` line
-  // wants. An earlier version of this repository put "node" in "command" and
-  // the script path in "args" while claiming to be shell form. Keep everything
-  // in the one string.
+  // What happens when gitleaks is not installed: the shell exits 127, the
+  // host reads any exit other than 2 as "allow", and the write goes through
+  // unscanned. That is a real trade, and it is taken with eyes open: the
+  // commit gate in .trunk/trunk.yaml runs Trunk's own pinned gitleaks and
+  // still refuses to let a secret into history, and tests/hooks.test.mjs
+  // fails the suite when gitleaks is missing from PATH, so CI and
+  // `npm run verify` both name the gap before it matters. The alternative was
+  // a wrapper script that fails closed, and a wrapper script is owned code.
+  //
+  // One host is the known exception, and SPEC.md's Known gaps row carries it:
+  // rulesync 16.14.0's generated OpenCode plugin runs this command WITHOUT
+  // piping the tool payload into stdin, so on OpenCode the scan reads empty
+  // input and exits 0 — the registration is decorative there until rulesync
+  // fixes its OpenCode hook template, and a missing gitleaks makes that host
+  // fail closed rather than open (its runner throws on any non-zero exit).
+  // The commit gate is OpenCode's real secret gate meanwhile.
+  //
+  // Path-free on purpose: the command names no file in this repository, so a
+  // fork never edits it. gitleaks installs are one line per platform:
+  //   winget install Gitleaks.Gitleaks     (Windows)
+  //   brew install gitleaks                (macOS)
+  //   https://github.com/gitleaks/gitleaks/releases (Linux, single binary)
   "version": 1,
   "hooks": {
     "preToolUse": [
@@ -32,28 +62,28 @@
         "matcher": "Write|Edit|MultiEdit|NotebookEdit",
         "type": "command",
         "timeout": 15,
-        "command": "node .rulesync/hooks/deny-secret-in-write.mjs",
+        "command": "gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2",
       },
     ],
   },
 
   // Copilot and Cline register preToolUse hooks but have no matcher on them,
   // so rulesync drops the entry above for those two rather than silently
-  // widening it. These override blocks put the same hook back without a
-  // matcher, which means it fires on every tool call there. That is cheap: the
-  // script exits 0 within milliseconds when the payload carries no `content`,
-  // `new_string`, or `edits`, which is every non-write tool.
+  // widening it. These override blocks put the same command back without a
+  // matcher, which means it fires on every tool call there. That is cheap:
+  // gitleaks reads whatever payload arrives and exits 0 in milliseconds when
+  // it holds no secret, which is every ordinary tool call.
   "copilot": {
     "hooks": {
       "preToolUse": [
-        { "type": "command", "timeout": 15, "command": "node .rulesync/hooks/deny-secret-in-write.mjs" },
+        { "type": "command", "timeout": 15, "command": "gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2" },
       ],
     },
   },
   "cline": {
     "hooks": {
       "preToolUse": [
-        { "type": "command", "timeout": 15, "command": "node .rulesync/hooks/deny-secret-in-write.mjs" },
+        { "type": "command", "timeout": 15, "command": "gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2" },
       ],
     },
   },
