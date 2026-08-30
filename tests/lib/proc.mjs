@@ -63,19 +63,6 @@ export function isolatedEnv(extra = {}) {
   };
 }
 
-// On POSIX, git runs under script(1) so trunk's git-hook callback sees a real
-// pseudo-terminal. Headless on Linux, the callback's "press spacebar to skip"
-// listener reads the immediate EOF on a closed stdin as that keypress and
-// reports "Check run skipped by user" — the push guard silently never ran,
-// which kept this suite red on every CI run. A pty that simply delivers no
-// input lets the check run to completion and block. script -e returns the
-// child's exit code; the tool ships in util-linux on every Linux runner.
-// Windows spawns git directly — its callback runs headless without the skip.
 export function git(args, opts = {}) {
-  const env = isolatedEnv(opts.env);
-  if (process.platform !== "win32") {
-    const cmd = ["git", ...args].map((a) => `'${String(a).replaceAll("'", `'\''`)}'`).join(" ");
-    return sh("script", ["-qec", cmd, "/dev/null"], { ...opts, env });
-  }
-  return sh("git", args, { ...opts, env });
+  return sh("git", args, { ...opts, env: isolatedEnv(opts.env) });
 }
