@@ -119,13 +119,6 @@ actions:
     - id: block-push-on-findings
       display_name: Refuse a push that fails any enabled check
       run: trunk check --ci --no-fix -t git-push --all
-      # Explicitly non-interactive. Upstream's stock pre-push hook is
-      # interactive: true (skip when unattended, a human can re-run); left
-      # unset, the callback still ran its attended-terminal skip path on
-      # Linux and let a credential-carrying push through headless -- every CI
-      # runner and every coding agent. false is the only mode where the
-      # check runs and blocks with no terminal at all.
-      interactive: false
       triggers:
         - git_hooks: [pre-push]
       notify_on_error: false
