@@ -63,6 +63,7 @@ lint:
         - .cline/skills/**
         - .cursor/skills/**
         - .github/skills/**
+        - .grok/skills/**
         - .opencode/skills/**
 
 # Trunk's stock pre-commit actions FIND a secret and then let it through.

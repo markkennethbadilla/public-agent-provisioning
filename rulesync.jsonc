@@ -56,6 +56,16 @@
     // Cline. VS Code extension, large install base. No "mcp" here; see the
     // note above the targets block.
     "cline": ["rules", "skills", "hooks", "permissions"],
+
+    // xAI Grok CLI. Rules land in the shared AGENTS.md; skills, hooks,
+    // permissions, and MCP servers under .grok/.
+    "grokcli": ["rules", "skills", "hooks", "permissions", "mcp"],
+
+    // Google Antigravity CLI (`agy`), the Gemini-lineage CLI. Reads the root
+    // AGENTS.md for rules and .agents/ for skills. No "permissions" here:
+    // rulesync supports Antigravity CLI permissions in --global mode only,
+    // so a project-scope generate would write nothing for it, silently.
+    "antigravity-cli": ["rules", "skills", "hooks", "mcp"],
   },
 
   // Write into the repository root. A monorepo that launches an agent per

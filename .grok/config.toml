@@ -1,0 +1,12 @@
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = [ "-y", "chrome-devtools-mcp@latest" ]
+
+[mcp_servers.officecli]
+command = "npx"
+args = [ "-y", "@officecli/officecli", "mcp" ]
+
+[permission]
+allow = []
+deny = [ "Bash(curl *|*sh*)", "Bash(git clean -*)", "Bash(git commit *--no-verify*)", "Bash(git push *--no-verify*)", "Bash(git push --force*)", "Bash(git push -f*)", "Bash(git reset --hard*)", "Bash(rm -fr *)", "Bash(rm -r *)", "Bash(rm -rf *)", "Bash(wget *|*sh*)", "Edit(**/.env)", "Edit(**/.ssh/**)", "Edit(**/credentials/**)", "Edit(**/secrets/**)", "Edit(.env)", "Read(**/*.p12)", "Read(**/*.pem)", "Read(**/.aws/**)", "Read(**/.env)", "Read(**/.env.*)", "Read(**/.netrc)", "Read(**/.npmrc)", "Read(**/.pypirc)", "Read(**/.ssh/**)", "Read(**/credentials/**)", "Read(**/id_ed25519*)", "Read(**/id_rsa*)", "Read(**/secrets/**)", "Read(.env)", "Read(.env.*)" ]
+ask = [ "Bash" ]

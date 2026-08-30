@@ -1,11 +1,12 @@
 # public-agent-provisioning
 
-**One folder that provisions seven AI coding agents with rules, skills, tools,
+**One folder that provisions nine AI coding agents with rules, skills, tools,
 and guardrails—and every moving part is owned by maintained software, not by
 you.**
 
 Fork this repository, run four commands, and Claude Code, Codex CLI, Cursor,
-GitHub Copilot, Cline, OpenCode, and anything that reads the plain `AGENTS.md`
+GitHub Copilot, Cline, OpenCode, Grok CLI, Google Antigravity CLI, and
+anything that reads the plain `AGENTS.md`
 standard all wake up with the same operating rules, 37 skills, two MCP tool
 servers—MCP is the Model Context Protocol, the standard by which an agent
 calls external programs, here one that drives Chrome and one that edits Office
@@ -68,7 +69,7 @@ npx rulesync install       # fetch the 35 pinned community skills (rulesync.lock
 npx trunk git-hooks sync   # Trunk writes the pre-commit and pre-push hooks
 ```
 
-Open the folder with any of the seven agents and it is provisioned. Nothing
+Open the folder with any of the nine agents and it is provisioned. Nothing
 else to configure: the generated files are committed, so the agents work even
 before the commands above finish—the commands make the guards and skill
 sources live on your machine.
@@ -142,8 +143,8 @@ message goes back into the agent's own transcript.
 
 | | Count | Where |
 |---|---|---|
-| Agent config files written for you | 1,037, across 7 agents | root `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, and `opencode.jsonc`, plus `.claude/`, `.cursor/`, `.codex/`, `.cline/`, `.clinerules/`, `.opencode/`, `.agents/`, `.vscode/`, and `.github/`—where `.github/workflows/ci.yml` is the one hand-written file among generated neighbours |
-| Source files that produce all 1,037 | 7 | `rulesync.jsonc` plus `.rulesync/` |
+| Agent config files written for you | 1,209, across 9 agents | root `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, and `opencode.jsonc`, plus `.claude/`, `.cursor/`, `.codex/`, `.cline/`, `.clinerules/`, `.opencode/`, `.agents/`, `.grok/`, `.vscode/`, and `.github/`—where `.github/workflows/ci.yml` is the one hand-written file among generated neighbours |
+| Source files that produce all 1,209 | 7 | `rulesync.jsonc` plus `.rulesync/` |
 | Community skills, pinned and locked | 35 from 4 upstream packages | `rulesync.jsonc` (`sources`), `rulesync.lock` |
 | MCP tool servers | 2 | `.rulesync/mcp.jsonc` |
 | Guard code you own and maintain | **0 lines** |—|
@@ -151,8 +152,9 @@ message goes back into the agent's own transcript.
 | Example skills to replace with real ones | 2 | `.rulesync/skills/` |
 | Self-checks that run on every pull request | 25 | `tests/` |
 
-The seven agents are Claude Code, OpenAI Codex CLI, Cursor, GitHub Copilot,
-Cline, `opencode`, and anything that reads the plain `AGENTS.md` standard.
+The nine agents are Claude Code, OpenAI Codex CLI, Cursor, GitHub Copilot,
+Cline, `opencode`, Grok CLI, Google Antigravity CLI, and anything that reads
+the plain `AGENTS.md` standard.
 
 Editing a generated file by hand is the one banned move. The `--check` mode of
 `rulesync` regenerates in memory, compares, and exits 1 on any change in
@@ -343,7 +345,7 @@ test caught it. A scan that never selects fields cannot repeat that bug.
 
 | Layer | First version | Second version | Now |
 |---|---|---|---|
-| Rules | one hand-written `AGENTS.md`, 8 unresolved placeholders | `rulesync` writes 30 files from 5 sources | `rulesync` writes 1,037 files from 8 sources |
+| Rules | one hand-written `AGENTS.md`, 8 unresolved placeholders | `rulesync` writes 30 files from 5 sources | `rulesync` writes 1,209 files from 8 sources |
 | Skills | a folder no agent harness ever read | 2 examples | 35 pinned community skills + 2 examples |
 | MCP tools | none | none | 2 vendor-shipped servers |
 | Tool-call hook | 690 lines of Python | 66 lines of Node shelling to `gitleaks` | one line of config: `gitleaks` is the command |

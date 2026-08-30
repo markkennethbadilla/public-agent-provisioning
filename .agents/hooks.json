@@ -1,0 +1,49 @@
+{
+  "rulesync": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "TodoWrite|todowrite|todoread|todo_write|update_plan",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'This project plans in files, not in a todo tool: put the plan in task_plan.md and track progress there (planning-with-files skill).' 1>&2; exit 2",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f task_plan.md ] || [ -f .planning/.active_plan ] || ls .planning/*/task_plan.md >/dev/null 2>&1; then echo '[planning-with-files] Update progress.md with what you just did. If a phase is now complete, update task_plan.md status.'; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "SH=$(ls .claude/skills/planning-with-files/scripts/gate-stop.sh \"$HOME/.claude/skills/planning-with-files/scripts/gate-stop.sh\" \"$HOME/.agents/skills/planning-with-files/scripts/gate-stop.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && sh \"$SH\" 2>/dev/null; exit 0",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
