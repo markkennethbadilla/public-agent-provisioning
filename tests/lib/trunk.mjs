@@ -9,14 +9,17 @@
 import assert from "node:assert/strict";
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { git, sh } from "./proc.mjs";
+import { ciBlindEnv, git, sh } from "./proc.mjs";
 import { REPO_ROOT, rmrf, scratchPath, scratchRepo } from "./scratch.mjs";
 
 // Trunk ships as a launcher script, which on Windows is a .cmd that Node will
 // not spawn without a shell. Every argument any caller passes is a fixed
 // literal, so there is nothing here for a shell to interpolate.
 export function trunk(args, cwd) {
-  return sh(["trunk", ...args].join(" "), [], { cwd, shell: true });
+  // ciBlindEnv: the first trunk call is what spawns the daemon, and the
+  // daemon keeps whatever environment it started with — see the note in
+  // proc.mjs for why a CI-marked daemon quietly unblocks every git hook.
+  return sh(["trunk", ...args].join(" "), [], { cwd, shell: true, env: ciBlindEnv() });
 }
 
 // Trunk leaves a daemon running that watches the repository it was invoked in,

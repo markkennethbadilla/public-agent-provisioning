@@ -7,6 +7,23 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// Trunk's git-hook callback goes non-blocking when it detects a CI
+// environment: it still runs the check and prints the finding ("Check run
+// skipped by user"), but exits 0 and lets the commit or push through, on the
+// theory that CI re-runs the same check anyway. Reasonable for a real
+// pipeline, fatal for this suite, whose whole subject is whether the hook
+// blocks. The detection reaches the hook two ways — the environment of the
+// git process that fires it, and the long-lived trunk daemon, which keeps the
+// environment it was first spawned with — so BOTH the git calls and every
+// trunk invocation (which is what starts the daemon) must run with the CI
+// markers removed. That is why this lives here, in the one place both spawn
+// paths share, and not in the git helper alone.
+export function ciBlindEnv() {
+  const env = { ...process.env };
+  for (const v of ["CI", "GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_WORKFLOW", "GITHUB_EVENT_NAME"]) delete env[v];
+  return env;
+}
+
 export function sh(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { encoding: "utf8", windowsHide: true, ...opts });
   if (r.error) return { code: -1, out: "", err: String(r.error.message || r.error) };
@@ -34,7 +51,7 @@ function emptyGitConfig() {
 export function isolatedEnv(extra = {}) {
   const empty = emptyGitConfig();
   return {
-    ...process.env,
+    ...ciBlindEnv(),
     GIT_CONFIG_GLOBAL: empty,
     GIT_CONFIG_SYSTEM: empty,
     GIT_AUTHOR_NAME: "Guard Selftest",
