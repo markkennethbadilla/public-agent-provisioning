@@ -59,6 +59,12 @@ export function isolatedEnv(extra = {}) {
     GIT_COMMITTER_NAME: "Guard Selftest",
     GIT_COMMITTER_EMAIL: "guard-selftest@example.invalid",
     GIT_TERMINAL_PROMPT: "0",
+    // Trunk skips a pre-push check when it believes no terminal exists
+    // ("Check run skipped by user") — true on the Linux CI runner, where
+    // stderr is a pipe. The commit hook runs headless regardless; only the
+    // push hook consults the TTY. TRUNK_PRETEND_TTY is Trunk's own override
+    // for exactly this, and the hook wrapper passes it through untouched.
+    TRUNK_PRETEND_TTY: "1",
     ...extra,
   };
 }
