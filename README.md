@@ -6,11 +6,13 @@ you.**
 
 Fork this repository, run four commands, and Claude Code, Codex CLI, Cursor,
 GitHub Copilot, Cline, OpenCode, and anything that reads the plain `AGENTS.md`
-standard all wake up with the same operating rules, 36 skills, two MCP tool
+standard all wake up with the same operating rules, 37 skills, two MCP tool
 servers—MCP is the Model Context Protocol, the standard by which an agent
 calls external programs, here one that drives Chrome and one that edits Office
-files—a hook that refuses to write a credential into a file, and git hooks
-that refuse to commit or push one.
+files—a hook that refuses to write a credential into a file, git hooks
+that refuse to commit or push one, and a file-based planning discipline whose
+stop gate keeps an agent from ending a turn with work still marked in
+progress.
 
 This repository contains **zero hand-rolled code**. Nothing here detects a
 secret, parses a payload, or installs a git hook. `gitleaks` detects, Trunk
@@ -24,7 +26,8 @@ refuses things.
 | Layer | Maintained owner | Fires | You edit |
 |---|---|---|---|
 | Rules, read every turn | `rulesync` 16.14.0 | every turn, unconditionally | `.rulesync/rules/overview.md` |
-| Skills, read on demand | `rulesync`, pinned to three upstream skill packages | when a conversation matches a skill description | `rulesync.jsonc` (`sources`), `.rulesync/skills/` |
+| Skills, read on demand | `rulesync`, pinned to four upstream skill packages | when a conversation matches a skill description | `rulesync.jsonc` (`sources`), `.rulesync/skills/` |
+| Planning gate | `rulesync` registers it; the scripts are the pinned `planning-with-files` skill's own | on session start, on every prompt, and on every attempted stop | `.rulesync/hooks.jsonc` |
 | MCP tool servers | `rulesync` registers them; Google and iOfficeAI ship them | when the agent reaches for a browser or an Office file | `.rulesync/mcp.jsonc` |
 | Tool-call hook | `rulesync` registers it; the command IS `gitleaks` 8.30.1 | the instant before a file write runs | `.rulesync/hooks.jsonc` |
 | Git guards | Trunk 1.25.0 | on `git commit` and `git push` | `.trunk/trunk.yaml` |
@@ -61,7 +64,7 @@ Then:
 git clone https://github.com/<your-fork>/public-agent-provisioning.git
 cd public-agent-provisioning
 npm install                # rulesync and the Trunk launcher, the only two dependencies
-npx rulesync install       # fetch the 34 pinned community skills (rulesync.lock decides the versions)
+npx rulesync install       # fetch the 35 pinned community skills (rulesync.lock decides the versions)
 npx trunk git-hooks sync   # Trunk writes the pre-commit and pre-push hooks
 ```
 
@@ -139,14 +142,14 @@ message goes back into the agent's own transcript.
 
 | | Count | Where |
 |---|---|---|
-| Agent config files written for you | 855, across 7 agents | root `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, and `opencode.jsonc`, plus `.claude/`, `.cursor/`, `.codex/`, `.cline/`, `.clinerules/`, `.opencode/`, `.agents/`, `.vscode/`, and `.github/`—where `.github/workflows/ci.yml` is the one hand-written file among generated neighbours |
-| Source files that produce all 855 | 7 | `rulesync.jsonc` plus `.rulesync/` |
-| Community skills, pinned and locked | 34 from 3 upstream packages | `rulesync.jsonc` (`sources`), `rulesync.lock` |
+| Agent config files written for you | 1,037, across 7 agents | root `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, and `opencode.jsonc`, plus `.claude/`, `.cursor/`, `.codex/`, `.cline/`, `.clinerules/`, `.opencode/`, `.agents/`, `.vscode/`, and `.github/`—where `.github/workflows/ci.yml` is the one hand-written file among generated neighbours |
+| Source files that produce all 1,037 | 7 | `rulesync.jsonc` plus `.rulesync/` |
+| Community skills, pinned and locked | 35 from 4 upstream packages | `rulesync.jsonc` (`sources`), `rulesync.lock` |
 | MCP tool servers | 2 | `.rulesync/mcp.jsonc` |
 | Guard code you own and maintain | **0 lines** |—|
 | Lines you are expected to change | 7, tagged **default**, carrying 9 values | `.rulesync/rules/overview.md` |
 | Example skills to replace with real ones | 2 | `.rulesync/skills/` |
-| Self-checks that run on every pull request | 24 | `tests/` |
+| Self-checks that run on every pull request | 25 | `tests/` |
 
 The seven agents are Claude Code, OpenAI Codex CLI, Cursor, GitHub Copilot,
 Cline, `opencode`, and anything that reads the plain `AGENTS.md` standard.
@@ -180,7 +183,7 @@ yourself if you use Cline and want the servers.
 
 ## The skills
 
-34 community skills arrive from three pinned sources, listed skill-by-skill in
+35 community skills arrive from four pinned sources, listed skill-by-skill in
 `rulesync.jsonc`:
 
 - **[`addyosmani/agent-skills`](https://github.com/addyosmani/agent-skills)**
@@ -193,6 +196,10 @@ yourself if you use Cline and want the servers.
 - **[`vale-cli/agent-tools`](https://github.com/vale-cli/agent-tools)** (MIT,
   Vale's own org): the skills that let an agent set up and run Vale instead of
   guessing at prose style.
+- **[`OthmanAdi/planning-with-files`](https://github.com/OthmanAdi/planning-with-files)**
+  (MIT): the file-based planning discipline—`task_plan.md`, `findings.md`,
+  `progress.md`—that replaces every agent's built-in todo tool. See the next
+  section.
 
 `npx rulesync install` resolves each pin to a commit and records per-skill
 integrity hashes in `rulesync.lock`, which is committed. CI installs with
@@ -202,6 +209,66 @@ committing it.
 
 The two skills under `.rulesync/skills/` are worked examples meant to be
 replaced with your own.
+
+## The plan is a file, and the agent cannot walk away from it
+
+Every agent CLI ships its own throwaway planner—Claude Code calls it
+`TodoWrite`, OpenCode `todowrite`, Codex CLI `update_plan`—and none of those
+plans survive a crash, a context compaction, or a hand-off to a different
+agent. Here the plan is three files on disk, from the pinned
+`planning-with-files` skill: `task_plan.md` (phases and statuses),
+`findings.md` (what was learned), `progress.md` (what was done).
+
+Four hook registrations in `.rulesync/hooks.jsonc` make the files real rather
+than advisory, and every command they run is the vendor's own script:
+
+- **Session start** creates the first plan if none exists. Without this the
+  skill installs everywhere and fires nothing, because deciding to plan was
+  left to the model's judgment.
+- **Every prompt** re-injects the current plan into context, so a long
+  session cannot drift away from it.
+- **Before compaction** injects it again, so the plan survives the exact
+  moment memory is thrown away.
+- **Stop** is the gate: the agent is refused permission to end its turn while
+  any phase is still `in_progress`. The refusal names the unfinished phase.
+  It fails open on the cases that must not trap a session—no plan directory,
+  `PLANNING_DISABLED=1` in the environment, or 20 blocks in one session.
+
+A fifth `preToolUse` registration closes the loophole: the built-in todo
+tools are blocked outright (exit 2), with a message pointing at the file
+plan, so there is exactly one place a plan can live.
+
+The skill's own hook declarations (in its `SKILL.md` frontmatter) are
+stripped by `rulesync` on publish, which is why the registrations live in
+`.rulesync/hooks.jsonc`—and why `tests/hooks.test.mjs` asserts all three
+scripts stay wired. A planning system that silently degrades to decoration is
+the failure mode this layer exists to prevent.
+
+## Supply chain posture
+
+Everything third-party is pinned, and the pins are enforced, not decorative:
+
+- **Skills**: every source in `rulesync.jsonc` is pinned to a tag or a commit
+  SHA. A tag alone would not be protection—tags are mutable, and an attacker
+  who takes over an upstream repository can move one—so the committed
+  `rulesync.lock` records the resolved commit and a per-skill integrity hash,
+  and CI installs with `--frozen`, which refuses anything that does not match
+  byte-for-byte. The lock is the boundary; the tag is the label.
+- **npm**: `package-lock.json` is committed, CI uses `npm ci`, and
+  `overrides` forces `tar@^7` under the Trunk launcher because its `tar` 6
+  transitive dependency carries known CVEs that `osv-scanner` blocks.
+- **Linters and scanners**: Trunk pins every tool version in
+  `.trunk/trunk.yaml`, including its own copy of `gitleaks` for the commit
+  and push gates.
+- **Updates are read, not trusted**: Renovate bumps pins continuously;
+  patch, minor, and digest updates merge themselves once CI is green, and a
+  major update waits for a person.
+
+The runtime guards stack in depth: the `preToolUse` gitleaks scan stops a
+secret at the tool call, the Trunk commit and push gates stop it at git, the
+permission layer denies reads and writes of credential paths outright, and
+GitHub push protection is the remote-side backstop. Each layer's known gaps
+are listed honestly in `SPEC.md`, with what covers each one.
 
 ## Fork it
 
@@ -276,8 +343,8 @@ test caught it. A scan that never selects fields cannot repeat that bug.
 
 | Layer | First version | Second version | Now |
 |---|---|---|---|
-| Rules | one hand-written `AGENTS.md`, 8 unresolved placeholders | `rulesync` writes 30 files from 5 sources | `rulesync` writes 855 files from 7 sources |
-| Skills | a folder no agent harness ever read | 2 examples | 34 pinned community skills + 2 examples |
+| Rules | one hand-written `AGENTS.md`, 8 unresolved placeholders | `rulesync` writes 30 files from 5 sources | `rulesync` writes 1,037 files from 8 sources |
+| Skills | a folder no agent harness ever read | 2 examples | 35 pinned community skills + 2 examples |
 | MCP tools | none | none | 2 vendor-shipped servers |
 | Tool-call hook | 690 lines of Python | 66 lines of Node shelling to `gitleaks` | one line of config: `gitleaks` is the command |
 | Git guards | 504 lines of bash + 502-line installer | `trunk git-hooks sync` | `trunk git-hooks sync` |

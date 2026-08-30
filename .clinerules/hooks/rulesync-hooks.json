@@ -1,6 +1,10 @@
 {
   "generatedBy": "rulesync",
   "events": [
-    "PreToolUse"
+    "PostToolUse",
+    "PreCompact",
+    "PreToolUse",
+    "TaskStart",
+    "UserPromptSubmit"
   ]
 }

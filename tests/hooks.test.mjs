@@ -31,7 +31,13 @@ const hooksSource = existsSync(HOOKS_JSONC) ? readFileSync(HOOKS_JSONC, "utf8") 
 // hooks.jsonc is JSONC, and this reads it with a regex rather than adding a
 // parser dependency for one field. A regex that stops matching fails loudly on
 // the first test below instead of quietly covering nothing.
-const COMMANDS = [...new Set([...hooksSource.matchAll(/"command"\s*:\s*"([^"]+)"/g)].map((m) => m[1]))];
+// Only the gitleaks guard commands: hooks.jsonc also wires the
+// planning-with-files hooks (vendor scripts that inject and gate the plan),
+// and those are not secret scanners, so the exit-code assertions below do not
+// apply to them. The "hook wiring" suite at the bottom covers them instead.
+const COMMANDS = [...new Set([...hooksSource.matchAll(/"command"\s*:\s*"([^"]+)"/g)].map((m) => m[1]))].filter(
+  (c) => c.includes("gitleaks stdin"),
+);
 
 // The tools under test, read out of the matcher in hooks.jsonc rather than
 // listed here. When a hand-picked array said "Write" and the matcher said
@@ -39,8 +45,16 @@ const COMMANDS = [...new Set([...hooksSource.matchAll(/"command"\s*:\s*"([^"]+)"
 // registered for NotebookEdit while reading a payload key NotebookEdit does
 // not carry, and allowed every notebook write through. The suite stayed green
 // because it had never once asked the matcher what it covered.
+// Read matchers paired with their command, and keep only the gitleaks
+// entries: hooks.jsonc also declares the todo-tool block and the planning
+// hooks, whose matchers (TodoWrite and friends, Write|Edit on postToolUse,
+// * on preCompact) must not be fed secret payloads here.
 const MATCHED_TOOLS = [
-  ...new Set([...hooksSource.matchAll(/"matcher"\s*:\s*"([^"]+)"/g)].flatMap((m) => m[1].split("|"))),
+  ...new Set(
+    [...hooksSource.matchAll(/"matcher"\s*:\s*"([^"]+)"[^{]*?"command"\s*:\s*"([^"]+)"/gs)]
+      .filter((m) => m[2].includes("gitleaks stdin"))
+      .flatMap((m) => m[1].split("|")),
+  ),
 ];
 
 // The payload key each tool carries its text in. They deliberately do not
@@ -190,11 +204,37 @@ describe("hook wiring", () => {
       [],
       `.rulesync/hooks/ holds ${stray.join(", ")}. This repository's hook layer is configuration only; a script there is owned guard code, which is the thing this template exists to avoid. Wire a maintained binary in hooks.jsonc instead.`,
     );
-    for (const command of COMMANDS) {
-      assert.ok(
-        !/\.(mjs|cjs|js|py|sh|ps1)\b/.test(command),
-        `hooks.jsonc declares "${command}", which runs a script file. The hook layer is configuration pointing at maintained binaries; a script is owned code.`,
+    const allCommands = [...new Set([...hooksSource.matchAll(/"command"\s*:\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]))];
+    for (const command of allCommands) {
+      // Vendor scripts shipped inside the pinned planning-with-files skill
+      // are maintained code, hash-locked by rulesync.lock — the ban is on
+      // scripts this repository would own.
+      const scriptRefs = [...command.matchAll(/[\w./~$-]+\.(?:mjs|cjs|js|py|sh|ps1)\b/g)].map((m) => m[0]);
+      const owned = scriptRefs.filter((p) => !p.includes("skills/planning-with-files/"));
+      assert.deepEqual(
+        owned,
+        [],
+        `hooks.jsonc declares "${command}", which runs script file(s) ${owned.join(", ")} that no pinned skill ships. The hook layer is configuration pointing at maintained binaries or pinned vendor skill scripts; anything else is owned code.`,
       );
     }
+  });
+
+  // The planning hooks exist because the skill's own frontmatter hooks are
+  // stripped by rulesync on publish — the skill installs everywhere and fires
+  // nothing, invisibly. This pins the wiring so that silent downgrade cannot
+  // come back.
+  it("the planning-with-files hooks are wired: inject on prompt, gate on stop", () => {
+    assert.ok(
+      hooksSource.includes("inject-plan.sh"),
+      "hooks.jsonc no longer runs inject-plan.sh, so the plan is never re-injected and the agent forgets it.",
+    );
+    assert.ok(
+      hooksSource.includes("gate-stop.sh"),
+      "hooks.jsonc no longer runs gate-stop.sh, so the completion gate is off and a turn can end mid-phase.",
+    );
+    assert.ok(
+      hooksSource.includes("init-session.sh"),
+      "hooks.jsonc no longer runs init-session.sh, so no first plan is ever created and the other two hooks stay silent forever.",
+    );
   });
 });

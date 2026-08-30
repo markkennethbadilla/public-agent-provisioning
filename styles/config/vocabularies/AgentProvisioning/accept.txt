@@ -73,3 +73,6 @@ else's
 [Gg]itignored
 [Dd]evDependency
 [Dd]evDependencies
+todo
+frontmatter
+ungated

@@ -119,7 +119,7 @@ on a finding.
 
 ### Generated files are committed, and CI fails on drift
 
-The 855 files agents actually read are committed rather than generated at
+The 1,037 files agents actually read are committed rather than generated at
 clone time, so a reader can see what an agent sees without installing
 anything. That
 choice makes hand-editing possible, so a job has to catch it.
@@ -140,13 +140,13 @@ changes what an agent is told.
 
 ### One source of truth for agent config
 
-`rulesync.jsonc` plus six files under `.rulesync/` produce all 855 generated
-files across 7 agents—rules, 36 skills, hook registrations, permissions, and
+`rulesync.jsonc` plus six files under `.rulesync/` produce all 1,037 generated
+files across 7 agents—rules, 37 skills, hook registrations, permissions, and
 MCP server entries. Editing a generated file by hand is the banned move,
 because the edit survives only until the next generate and then vanishes with
 no error.
 
-The 34 community skills among those sources are pinned, not vendored.
+The 35 community skills among those sources are pinned, not vendored.
 `rulesync.jsonc` names each skill and its source pin, `npx rulesync install`
 fetches them into a gitignored cache, and `rulesync.lock` records the resolved
 commit and a per-skill integrity hash. CI installs with `--frozen`, so a pin
@@ -160,6 +160,23 @@ Four sections do that, one per generated shape, and the source files under
 `.rulesync/` stay linted. Adding a target to `rulesync.jsonc` writes another
 copy of the same prose, so that target's directory has to join the brace list in
 `.vale.ini` at the same time.
+
+### The plan lives in files, and the stop gate enforces it
+
+The pinned `planning-with-files` skill supplies the discipline: `task_plan.md`,
+`findings.md`, and `progress.md` on disk, instead of any agent's built-in todo
+tool. `.rulesync/hooks.jsonc` registers the skill's own scripts at session
+start (create the first plan), on every prompt and before compaction
+(re-inject it), and on stop (refuse to end a turn while a phase is
+`in_progress`, failing open on no plan, `PLANNING_DISABLED=1`, or 20 blocks).
+A `preToolUse` entry blocks the native todo tools by name with exit 2.
+
+The registrations live here and not in the skill because rulesync strips hook
+declarations from skill frontmatter when publishing—installed-but-silent is
+the failure mode, and `tests/hooks.test.mjs` pins the wiring. The todo-tool
+block is a hook rather than a permission because rulesync's permission model
+has no key that denies a named tool; a `claudecode.permissions.deny` list is
+silently dropped (verified against 16.14.0).
 
 ## Escape hatches
 
@@ -236,6 +253,9 @@ of the few places where writing code is the honest answer.
 | The push guard runs `trunk check --all` | A finding anywhere in the working tree blocks the push, including one in a file that is not being pushed | Deliberate. `--commit-ref-from-pre-push` resolves an empty range on the first push to an empty remote, so it checked nothing and exited 0 |
 | The permission entries in `.rulesync/permissions.jsonc` have no test pair | The agent host enforces them, so nothing in this repository can invoke one and watch it refuse | No maintained runner exists for it. The drift check proves the entries reach every generated file, and the host is what acts on them |
 | rulesync 16.14.0's generated OpenCode plugin never pipes the payload into the hook command | OpenCode's registration runs `gitleaks stdin` against empty input, which exits 0, so on that one host the hook scans nothing—and if `gitleaks` is missing there it fails closed instead, blocking every matched call | An upstream fix in rulesync's OpenCode hook template. Until then the commit guard is OpenCode's real secret gate, and this row is the honest label on the registration |
+
+| The planning gate's stop hook runs POSIX `sh` | On a Windows host whose agent runs hooks through cmd.exe rather than Git Bash's sh, the gate command exits without gating and the stop goes through ungated | The skill ships PowerShell twins (`check-complete.ps1 -Gate`); wire them in `.rulesync/hooks.jsonc` if your host resolves hooks through PowerShell. Claude Code on Windows runs hooks through Git Bash, which covers the default case |
+| rulesync drops hook events a target cannot express | Cline gets no `postToolUse` or `preCompact` registration, so the planning nudge and pre-compaction inject are absent there; the prompt-time inject still fires | Upstream feature coverage. The plan files themselves are agent-agnostic, so nothing is lost from disk |
 
 Renovate keeps every pinned version current. Patch, minor, and digest updates
 merge themselves once CI is green. A major update opens a pull request for a

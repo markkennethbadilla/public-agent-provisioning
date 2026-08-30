@@ -79,6 +79,13 @@
     },
   },
 
+  // The native todo/plan tools (Claude Code's TodoWrite and friends) are NOT
+  // denied here: rulesync's permission model carries no key for denying a
+  // named tool (a `claudecode.permissions.deny` list is silently dropped —
+  // verified against 16.14.0). The deny lives in .rulesync/hooks.jsonc
+  // instead, as a preToolUse hook that exits 2 on the todo tools and points
+  // at the file-based plan.
+
   // Cline has no `ask` action, so rulesync translates every `ask` into `deny`
   // to fail closed. Applied to the `*` catch-all above that denies every shell
   // command and leaves Cline unable to run anything. This block replaces the

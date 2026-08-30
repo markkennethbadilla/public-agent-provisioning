@@ -83,6 +83,22 @@
   // unread instruction.
   "sources": [
     {
+      // The one planning mechanism, for every agent. Each CLI names its own
+      // todo tool differently (Claude Code TodoWrite, OpenCode todowrite,
+      // Codex update_plan), and some ship none, so the plan lives in files
+      // instead: task_plan.md, findings.md, progress.md — written to disk,
+      // re-injected each turn by the hooks in .rulesync/hooks.jsonc, and
+      // surviving a compaction or a crash. The native todo tools are blocked
+      // by a preToolUse hook in .rulesync/hooks.jsonc, so there is exactly
+      // one place a plan can live. MIT. Tag v3.11.2 is the newest release
+      // (2026-08-27); rulesync.lock holds the resolved commit and per-skill
+      // hashes, so a moved tag cannot swap the code.
+      "source": "OthmanAdi/planning-with-files@v3.11.2",
+      "skills": [
+        "planning-with-files"
+      ]
+    },
+    {
       // General engineering skills. MIT. Tag 0.6.7 is the newest release
       // (2026-08-14), verified to contain every name below.
       "source": "addyosmani/agent-skills@0.6.7",

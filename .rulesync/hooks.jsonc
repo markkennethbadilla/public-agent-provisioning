@@ -64,6 +64,77 @@
         "timeout": 15,
         "command": "gitleaks stdin -v --no-color --no-banner --redact --exit-code 2 1>&2",
       },
+      {
+        // The native todo/plan tools, blocked. The plan lives in files
+        // (planning-with-files, below); a built-in todo list is a second
+        // half-plan that dies with the session. rulesync has no permission
+        // key that can deny a named tool, so the deny is this hook: exit 2
+        // refuses the call and the message points at the file plan. The
+        // matcher carries each agent's own name for the tool, since every
+        // CLI names it differently.
+        "matcher": "TodoWrite|todowrite|todoread|todo_write|update_plan",
+        "type": "command",
+        "timeout": 5,
+        "command": "echo 'This project plans in files, not in a todo tool: put the plan in task_plan.md and track progress there (planning-with-files skill).' 1>&2; exit 2",
+      },
+    ],
+
+    // planning-with-files, gated. The skill (pinned in rulesync.jsonc)
+    // declares these same hooks in its own SKILL.md frontmatter, and rulesync
+    // strips that key when it publishes — so the skill installs on every
+    // agent and fires nothing, invisibly. Declaring them here is what makes
+    // the plan real: the sessionStart hook creates the first plan, the
+    // prompt hook re-injects it each turn, and the Stop hook refuses to end
+    // a turn while a phase is still in_progress (the gate returns a block
+    // decision naming the unfinished phase). Every command is the vendor's
+    // own script, resolved from wherever the skill is installed — this
+    // repository's generated .claude/skills/ first, then the user-scope
+    // installs — and each ends in `exit 0`, so a missing skill degrades to
+    // silence rather than wedging a turn. The gate itself fails open on: no
+    // plan directory, PLANNING_DISABLED=1, stop_hook_active, or 20 blocks in
+    // one session, so it cannot trap a session indefinitely.
+    "sessionStart": [
+      {
+        "type": "command",
+        "timeout": 30,
+        "command": "[ -n \"$PLANNING_DISABLED\" ] && exit 0; [ -d .planning ] && exit 0; SH=$(ls .claude/skills/planning-with-files/scripts/init-session.sh \"$HOME/.claude/skills/planning-with-files/scripts/init-session.sh\" \"$HOME/.agents/skills/planning-with-files/scripts/init-session.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && sh \"$SH\" --gated plan >/dev/null 2>&1; exit 0",
+      },
+    ],
+
+    // rulesync's canonical name for the UserPromptSubmit event; it translates
+    // this spelling per target.
+    "beforeSubmitPrompt": [
+      {
+        "type": "command",
+        "timeout": 15,
+        "command": "SH=$(ls .claude/skills/planning-with-files/scripts/inject-plan.sh \"$HOME/.claude/skills/planning-with-files/scripts/inject-plan.sh\" \"$HOME/.agents/skills/planning-with-files/scripts/inject-plan.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && sh \"$SH\" --context=userprompt; exit 0",
+      },
+    ],
+
+    "postToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "type": "command",
+        "timeout": 10,
+        "command": "if [ -f task_plan.md ] || [ -f .planning/.active_plan ] || ls .planning/*/task_plan.md >/dev/null 2>&1; then echo '[planning-with-files] Update progress.md with what you just did. If a phase is now complete, update task_plan.md status.'; fi",
+      },
+    ],
+
+    "preCompact": [
+      {
+        "matcher": "*",
+        "type": "command",
+        "timeout": 15,
+        "command": "SH=$(ls .claude/skills/planning-with-files/scripts/inject-plan.sh \"$HOME/.claude/skills/planning-with-files/scripts/inject-plan.sh\" \"$HOME/.agents/skills/planning-with-files/scripts/inject-plan.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && sh \"$SH\" --context=precompact; exit 0",
+      },
+    ],
+
+    "stop": [
+      {
+        "type": "command",
+        "timeout": 20,
+        "command": "SH=$(ls .claude/skills/planning-with-files/scripts/gate-stop.sh \"$HOME/.claude/skills/planning-with-files/scripts/gate-stop.sh\" \"$HOME/.agents/skills/planning-with-files/scripts/gate-stop.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && sh \"$SH\" 2>/dev/null; exit 0",
+      },
     ],
   },
 

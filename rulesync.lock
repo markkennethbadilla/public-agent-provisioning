@@ -1,10 +1,20 @@
 {
   "lockfileVersion": 1,
   "sources": {
+    "othmanadi/planning-with-files@v3.11.2": {
+      "requestedRef": "v3.11.2",
+      "resolvedRef": "9e94390e5912b1ff296556505cd999ff84838160",
+      "resolvedAt": "2026-08-30T07:13:27.359Z",
+      "skills": {
+        "planning-with-files": {
+          "integrity": "sha256-680ce6baf9ffca52086254fcca76daca05add9d5b3370411c9ceeaa072ec800c"
+        }
+      }
+    },
     "addyosmani/agent-skills@0.6.7": {
       "requestedRef": "0.6.7",
       "resolvedRef": "df1edb2e05487d0aa6d93c747141e0aed1187f25",
-      "resolvedAt": "2026-08-23T12:43:40.477Z",
+      "resolvedAt": "2026-08-30T07:14:05.608Z",
       "skills": {
         "api-and-interface-design": {
           "integrity": "sha256-b2fa57f7326e3b17ce2a902e9f0e6ab7d581502411e4b063f68bf193690f901e"
@@ -83,7 +93,7 @@
     "anthropics/skills@3b3fad96af16a10759d930941b4520ba0c40edae": {
       "requestedRef": "3b3fad96af16a10759d930941b4520ba0c40edae",
       "resolvedRef": "3b3fad96af16a10759d930941b4520ba0c40edae",
-      "resolvedAt": "2026-08-23T12:44:37.020Z",
+      "resolvedAt": "2026-08-30T07:14:52.812Z",
       "skills": {
         "claude-api": {
           "integrity": "sha256-eae4ead7120ab89f8df7e1efa6836562d66908b60ca33eec36dd4ffce7d5af26"
@@ -105,7 +115,7 @@
     "vale-cli/agent-tools@dcef76fe3ee6173aa2dcfcc406fc1232bd3433a8": {
       "requestedRef": "dcef76fe3ee6173aa2dcfcc406fc1232bd3433a8",
       "resolvedRef": "dcef76fe3ee6173aa2dcfcc406fc1232bd3433a8",
-      "resolvedAt": "2026-08-23T12:44:42.536Z",
+      "resolvedAt": "2026-08-30T07:14:57.778Z",
       "skills": {
         "ci": {
           "integrity": "sha256-fff4d9eca561800be74e2416a5091822d12725a09c068a330ccbc1be3a8d09e4"
