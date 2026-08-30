@@ -62,9 +62,9 @@ export function isolatedEnv(extra = {}) {
     // Trunk skips a pre-push check when it believes no terminal exists
     // ("Check run skipped by user") — true on the Linux CI runner, where
     // stderr is a pipe. The commit hook runs headless regardless; only the
-    // push hook consults the TTY. TRUNK_PRETEND_TTY is Trunk's own override
-    // for exactly this, and the hook wrapper passes it through untouched.
-    TRUNK_PRETEND_TTY: "1",
+    // push hook consults the TTY. TRUNK_STDIN_IS_TTY is the hook wrapper's own flag
+    // — it sets it when it finds a terminal and passes an inherited value through untouched, so exporting it here makes the callback treat the run as attended.
+    TRUNK_STDIN_IS_TTY: "1",
     ...extra,
   };
 }
