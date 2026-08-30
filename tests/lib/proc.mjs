@@ -59,16 +59,23 @@ export function isolatedEnv(extra = {}) {
     GIT_COMMITTER_NAME: "Guard Selftest",
     GIT_COMMITTER_EMAIL: "guard-selftest@example.invalid",
     GIT_TERMINAL_PROMPT: "0",
-    // Trunk skips a pre-push check when it believes no terminal exists
-    // ("Check run skipped by user") — true on the Linux CI runner, where
-    // stderr is a pipe. The commit hook runs headless regardless; only the
-    // push hook consults the TTY. TRUNK_STDIN_IS_TTY is the hook wrapper's own flag
-    // — it sets it when it finds a terminal and passes an inherited value through untouched, so exporting it here makes the callback treat the run as attended.
-    TRUNK_STDIN_IS_TTY: "1",
     ...extra,
   };
 }
 
+// On POSIX, git runs under script(1) so trunk's git-hook callback sees a real
+// pseudo-terminal. Headless on Linux, the callback's "press spacebar to skip"
+// listener reads the immediate EOF on a closed stdin as that keypress and
+// reports "Check run skipped by user" — the push guard silently never ran,
+// which kept this suite red on every CI run. A pty that simply delivers no
+// input lets the check run to completion and block. script -e returns the
+// child's exit code; the tool ships in util-linux on every Linux runner.
+// Windows spawns git directly — its callback runs headless without the skip.
 export function git(args, opts = {}) {
-  return sh("git", args, { ...opts, env: isolatedEnv(opts.env) });
+  const env = isolatedEnv(opts.env);
+  if (process.platform !== "win32") {
+    const cmd = ["git", ...args].map((a) => `'${String(a).replaceAll("'", `'\''`)}'`).join(" ");
+    return sh("script", ["-qec", cmd, "/dev/null"], { ...opts, env });
+  }
+  return sh("git", args, { ...opts, env });
 }
