@@ -66,6 +66,7 @@ gets patched by people who are paid to patch it.
 | `gitleaks` 8.30.1 on `PATH` | the tool-call hook only, as the hook command itself | your own package manager |
 | Vale | prose linting | your own package manager locally, `vale-cli/vale-action` in CI |
 | Chrome | the `chrome-devtools-mcp` server, when an agent uses it | your own package manager |
+| `oh-my-openagent` 4.19.4 | OpenCode only: orchestrator, background subagents, stop continuation, hash-anchored edits | pinned in `opencode.jsonc` (`plugin`); OpenCode fetches it on first start, `.omo/omo.jsonc` configures it |
 
 Trunk downloads and pins `gitleaks`, `osv-scanner`, `actionlint`, and
 `shellcheck` for the commit and push guards, so those four need nothing on
@@ -257,6 +258,7 @@ of the few places where writing code is the honest answer.
 
 | The planning gate's stop hook runs POSIX `sh` | On a Windows host whose agent runs hooks through cmd.exe rather than Git Bash's sh, the gate command exits without gating and the stop goes through ungated | The skill ships PowerShell twins (`check-complete.ps1 -Gate`); wire them in `.rulesync/hooks.jsonc` if your host resolves hooks through PowerShell. Claude Code on Windows runs hooks through Git Bash, which covers the default case |
 | Antigravity CLI gets a partial planning gate and no project-scope permissions | rulesync skips `sessionStart`, `beforeSubmitPrompt`, and `preCompact` for `antigravity-cli`, so no plan auto-creates or re-injects there (the Stop gate and todo block still fire); its permissions are supported in `--global` mode only, so the deny list does not reach it from this repository | Upstream feature coverage in rulesync. The rules prose and the on-disk plan files carry the discipline meanwhile |
+| The OpenCode parity layer reaches OpenCode alone | `oh-my-openagent` is an OpenCode plugin, so the orchestrator, background subagents and stop continuation it adds exist on no other target; Claude Code has them natively, the rest do not | Nothing to do for Claude Code. For Codex CLI the same project ships a Light edition; it is not pinned here because its installer rewrites Codex permissions, which `.rulesync/permissions.jsonc` owns |
 | rulesync drops hook events a target cannot express | Cline gets no `postToolUse` or `preCompact` registration, so the planning nudge and pre-compaction inject are absent there; the prompt-time inject still fires | Upstream feature coverage. The plan files themselves are agent-agnostic, so nothing is lost from disk |
 
 Renovate keeps every pinned version current. Patch, minor, and digest updates

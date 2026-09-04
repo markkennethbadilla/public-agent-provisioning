@@ -1,0 +1,49 @@
+{
+  // oh-my-openagent (https://github.com/code-yeongyu/oh-my-openagent), the
+  // OpenCode plugin that gives it what Claude Code has natively: background
+  // subagents, an orchestrator layer, a Stop hook that keeps a turn going, and
+  // hash-anchored edits for weaker models. The plugin is pinned in
+  // opencode.jsonc (`plugin: ["oh-my-openagent@4.19.4"]`); this file is its
+  // project-scope config. The plugin walks up from the working directory and
+  // reads the closest `.omo/omo.jsonc`, so this one wins over `~/.omo/omo.jsonc`.
+  //
+  // No model is named here on purpose. OpenCode is the bring-your-own-model
+  // target, so every plugin agent inherits `model` and `small_model` from
+  // opencode.jsonc or the OpenCode default. To pin one, add
+  // `"agents": { "sisyphus": { "model": "provider/model" } }` under
+  // "[opencode]", using a name from `opencode models`.
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+
+  "[opencode]": {
+    "telemetry": false,
+
+    // Hash-anchored edit tool: stops stale-line corruption on weaker models.
+    "hashline_edit": true,
+
+    // Every hook below duplicates or contradicts a layer this repository
+    // already owns. One source per job; the rulesync-generated plugin in
+    // .opencode/plugins/ is the hook runner, and the plan lives in files.
+    "disabled_hooks": [
+      // Replays .claude/settings.json hooks onto OpenCode. rulesync already
+      // writes the same registrations into .opencode/plugins/rulesync-hooks.js,
+      // so leaving this on runs gitleaks and the stop gate twice per event.
+      "claude-code-hooks",
+      // Renovate bumps the pin and CI vets it. A startup check that nags for
+      // a newer version is a second, unvetted update path.
+      "auto-update-checker",
+      "startup-toast",
+      // The todo tools are refused by the preToolUse hook in
+      // .rulesync/hooks.jsonc (exit 2). These four manage a todo list that
+      // cannot exist here, and the continuation enforcer would keep asking
+      // the agent to finish todos it is not allowed to write.
+      "tasks-todowrite-disabler",
+      "todo-continuation-enforcer",
+      "compaction-todo-preserver",
+      "todo-description-override",
+      // Injects .cursor/rules, .claude/rules and .opencode/rules into the
+      // prompt. rulesync writes those from the same overview.md that OpenCode
+      // already reads as AGENTS.md, so the rules would arrive twice.
+      "rules-injector"
+    ]
+  }
+}

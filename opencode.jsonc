@@ -59,5 +59,8 @@
       ],
       "enabled": true
     }
-  }
+  },
+  "plugin": [
+    "oh-my-openagent@4.19.4"
+  ]
 }

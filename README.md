@@ -30,6 +30,7 @@ refuses things.
 | Skills, read on demand | `rulesync`, pinned to four upstream skill packages | when a conversation matches a skill description | `rulesync.jsonc` (`sources`), `.rulesync/skills/` |
 | Planning gate | `rulesync` registers it; the scripts are the pinned `planning-with-files` skill's own | on session start, on every prompt, and on every attempted stop | `.rulesync/hooks.jsonc` |
 | MCP tool servers | `rulesync` registers them; Google and iOfficeAI ship them | when the agent reaches for a browser or an Office file | `.rulesync/mcp.jsonc` |
+| OpenCode parity layer | `oh-my-openagent` 4.19.4, pinned as an OpenCode plugin | when OpenCode delegates, edits, or tries to stop early | `opencode.jsonc` (`plugin`), `.omo/omo.jsonc` |
 | Tool-call hook | `rulesync` registers it; the command IS `gitleaks` 8.30.1 | the instant before a file write runs | `.rulesync/hooks.jsonc` |
 | Git guards | Trunk 1.25.0 | on `git commit` and `git push` | `.trunk/trunk.yaml` |
 | Self-checks | `node:test`, Node standard library | on demand and on every pull request | `tests/` |
@@ -145,12 +146,13 @@ message goes back into the agent's own transcript.
 |---|---|---|
 | Agent config files written for you | 1,209, across 9 agents | root `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, and `opencode.jsonc`, plus `.claude/`, `.cursor/`, `.codex/`, `.cline/`, `.clinerules/`, `.opencode/`, `.agents/`, `.grok/`, `.vscode/`, and `.github/`—where `.github/workflows/ci.yml` is the one hand-written file among generated neighbours |
 | Source files that produce all 1,209 | 7 | `rulesync.jsonc` plus `.rulesync/` |
+| OpenCode plugin config, not generated | 1 | `.omo/omo.jsonc` |
 | Community skills, pinned and locked | 35 from 4 upstream packages | `rulesync.jsonc` (`sources`), `rulesync.lock` |
 | MCP tool servers | 2 | `.rulesync/mcp.jsonc` |
 | Guard code you own and maintain | **0 lines** |—|
 | Lines you are expected to change | 7, tagged **default**, carrying 9 values | `.rulesync/rules/overview.md` |
 | Example skills to replace with real ones | 2 | `.rulesync/skills/` |
-| Self-checks that run on every pull request | 25 | `tests/` |
+| Self-checks that run on every pull request | 28 | `tests/` |
 
 The nine agents are Claude Code, OpenAI Codex CLI, Cursor, GitHub Copilot,
 Cline, `opencode`, Grok CLI, Google Antigravity CLI, and anything that reads
@@ -245,6 +247,40 @@ stripped by `rulesync` on publish, which is why the registrations live in
 `.rulesync/hooks.jsonc`—and why `tests/hooks.test.mjs` asserts all three
 scripts stay wired. A planning system that silently degrades to decoration is
 the failure mode this layer exists to prevent.
+
+## OpenCode gets the same harness
+
+OpenCode reads every layer above, but stock OpenCode has no orchestrator, no
+background subagents, no Stop hook that can keep a turn going, and no edit
+safety for weaker models. Those four are what make Claude Code feel finished,
+and they exist for OpenCode as one maintained package:
+[`oh-my-openagent`](https://github.com/code-yeongyu/oh-my-openagent). It is
+pinned as an OpenCode plugin in `opencode.jsonc` and configured from
+`.omo/omo.jsonc`, the project-scope file the plugin reads before the one in
+your home directory.
+
+The configuration does two things, and the second is the one that matters:
+
+- **Enables** `hashline_edit`, the hash-anchored edit tool that stops a weaker
+  model from corrupting a file it read a moment ago.
+- **Disables** every plugin hook that duplicates a layer this repository
+  already owns. The plugin's Claude Code hook bridge is off because
+  `rulesync` already writes the same registrations into
+  `.opencode/plugins/rulesync-hooks.js`; on, every event would run `gitleaks`
+  and the stop gate twice. Its todo hooks are off because the todo tools are
+  refused and the plan lives in files. Its rules injector is off because
+  OpenCode already reads `AGENTS.md`. Its update checker and startup toast are
+  off because Renovate owns updates. `.omo/omo.jsonc` names each hook and the
+  owner that replaces it.
+
+No model is set. OpenCode is the bring-your-own-model target, so every plugin
+agent inherits whatever `opencode.jsonc` or your OpenCode default names. To
+pin one per agent, add an `agents` block to `.omo/omo.jsonc` using a name from
+`opencode models`.
+
+`tests/opencode-parity.test.mjs` keeps the pin exact and the duplicate hooks
+disabled. Renovate bumps the pin through the same pull request path as every
+other dependency.
 
 ## Supply chain posture
 

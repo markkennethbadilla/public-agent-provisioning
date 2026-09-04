@@ -1,6 +1,15 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":dependencyDashboard"],
+  "customManagers": [
+    {
+      "description": "The oh-my-openagent pin in opencode.jsonc. OpenCode installs plugins from npm, so the npm datasource is the source of truth for the next version.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^opencode\\.jsonc$/"],
+      "matchStrings": ["\"(?<depName>oh-my-openagent)@(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],
+      "datasourceTemplate": "npm"
+    }
+  ],
   "packageRules": [
     {
       "description": "Patch, minor and digest updates merge themselves once CI is green. A major update still opens a pull request for a person to read.",

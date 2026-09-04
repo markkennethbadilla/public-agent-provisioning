@@ -50,7 +50,10 @@
 
     // OpenCode. Bring-your-own-model, so it is the target a forker uses when
     // they are not on any vendor subscription. MCP servers land in
-    // opencode.jsonc.
+    // opencode.jsonc. That file also carries a `plugin` key rulesync does not
+    // own: the pinned oh-my-openagent entry (configured in .omo/omo.jsonc).
+    // rulesync merges into opencode.jsonc rather than replacing it, so the
+    // key survives every generate and --check (verified on 16.14.0).
     "opencode": ["rules", "skills", "hooks", "permissions", "mcp"],
 
     // Cline. VS Code extension, large install base. No "mcp" here; see the
