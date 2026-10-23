@@ -1,0 +1,6 @@
+# osv-scanner reads this file (Trunk runs it). Each entry is a known CVE with no
+# fixed release upstream; it expires so it is re-read, never forgotten.
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2027-01-23T00:00:00Z
+reason = "braces 3.0.3 is the last release and is listed as affected with no fix; reached only through rulesync, globby, fast-glob and micromatch on our own glob patterns, never on input from outside"

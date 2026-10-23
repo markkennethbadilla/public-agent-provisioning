@@ -86,8 +86,8 @@
 
   // Pinned community skill packages. `npx rulesync install` fetches them into
   // `.rulesync/skills/.curated/` (gitignored) and records the resolved commit
-  // plus per-skill integrity hashes in `rulesync.lock` (committed). CI installs
-  // with `--frozen`, so a fork gets byte-for-byte what these pins name. Bump
+  // plus per-skill integrity hashes in `rulesync.lock` (committed). The pre-push
+  // gate installs with `--frozen`, so a fork gets byte-for-byte what these pins name. Bump
   // pins with `npx rulesync install --update`, then read the diff.
   //
   // Every source below is listed skill-by-skill on purpose. The whole-source

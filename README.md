@@ -47,7 +47,7 @@ flowchart LR
     C --> D["git commit"]
     D -->|gitleaks finds a key| Y["exit 1, commit refused"]
     D -->|clean| E["git push"]
-    E --> F["CI: Trunk, Vale, drift check, node --test"]
+    E --> F["pre-push gate: Trunk, Vale, drift check, node --test"]
 ```
 
 ## Quickstart
@@ -144,7 +144,7 @@ message goes back into the agent's own transcript.
 
 | | Count | Where |
 |---|---|---|
-| Agent config files written for you | 1,209, across 9 agents | root `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, and `opencode.jsonc`, plus `.claude/`, `.cursor/`, `.codex/`, `.cline/`, `.clinerules/`, `.opencode/`, `.agents/`, `.grok/`, `.vscode/`, and `.github/`—where `.github/workflows/ci.yml` is the one hand-written file among generated neighbours |
+| Agent config files written for you | 1,209, across 9 agents | root `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, and `opencode.jsonc`, plus `.claude/`, `.cursor/`, `.codex/`, `.cline/`, `.clinerules/`, `.opencode/`, `.agents/`, `.grok/`, `.vscode/`, and `.github/` |
 | Source files that produce all 1,209 | 7 | `rulesync.jsonc` plus `.rulesync/` |
 | OpenCode plugin config, not generated | 1 | `.omo/omo.jsonc` |
 | Community skills, pinned and locked | 35 from 4 upstream packages | `rulesync.jsonc` (`sources`), `rulesync.lock` |
@@ -152,7 +152,7 @@ message goes back into the agent's own transcript.
 | Guard code you own and maintain | **0 lines** |—|
 | Lines you are expected to change | 7, tagged **default**, carrying 9 values | `.rulesync/rules/overview.md` |
 | Example skills to replace with real ones | 2 | `.rulesync/skills/` |
-| Self-checks that run on every pull request | 28 | `tests/` |
+| Self-checks that run before every push | 28 | `tests/` |
 
 The nine agents are Claude Code, OpenAI Codex CLI, Cursor, GitHub Copilot,
 Cline, `opencode`, Grok CLI, Google Antigravity CLI, and anything that reads
@@ -160,8 +160,8 @@ the plain `AGENTS.md` standard.
 
 Editing a generated file by hand is the one banned move. The `--check` mode of
 `rulesync` regenerates in memory, compares, and exits 1 on any change in
-meaning. The `generated-files-match-source` job in `.github/workflows/ci.yml`
-runs it on every pull request.
+meaning. The pre-push gate (`npm run verify`, wired in
+`.trunk/trunk.yaml`) runs it before every push.
 
 ## The MCP servers
 
@@ -206,7 +206,7 @@ yourself if you use Cline and want the servers.
   section.
 
 `npx rulesync install` resolves each pin to a commit and records per-skill
-integrity hashes in `rulesync.lock`, which is committed. CI installs with
+integrity hashes in `rulesync.lock`, which is committed. The pre-push gate installs with
 `--frozen`, so what a fork gets is byte-for-byte what the lockfile names. Bump
 everything with `npx rulesync install --update`, then read the diff before
 committing it.
@@ -290,17 +290,19 @@ Everything third-party is pinned, and the pins are enforced, not decorative:
   SHA. A tag alone would not be protection—tags are mutable, and an attacker
   who takes over an upstream repository can move one—so the committed
   `rulesync.lock` records the resolved commit and a per-skill integrity hash,
-  and CI installs with `--frozen`, which refuses anything that does not match
+  and the pre-push gate installs with `--frozen`, which refuses anything that does not match
   byte-for-byte. The lock is the boundary; the tag is the label.
-- **npm**: `package-lock.json` is committed, CI uses `npm ci`, and
+- **npm**: `package-lock.json` is committed, `npm ci` installs from it, and
   `overrides` forces `tar@^7` under the Trunk launcher because its `tar` 6
-  transitive dependency carries known CVEs that `osv-scanner` blocks.
+  transitive dependency carries known CVEs that `osv-scanner` blocks; the
+  MCP SDK, `js-yaml` and `smol-toml` overrides do the same for rulesync's
+  tree, and `osv-scanner.toml` lists the one CVE with no fixed release.
 - **Linters and scanners**: Trunk pins every tool version in
   `.trunk/trunk.yaml`, including its own copy of `gitleaks` for the commit
   and push gates.
 - **Updates are read, not trusted**: Renovate bumps pins continuously;
-  patch, minor, and digest updates merge themselves once CI is green, and a
-  major update waits for a person.
+  every update waits in a pull request for a person or a vetting agent to
+  read, because no CI runs on pull requests.
 
 The runtime guards stack in depth: the `preToolUse` gitleaks scan stops a
 secret at the tool call, the Trunk commit and push gates stop it at git, the

@@ -105,8 +105,7 @@ describe("PreToolUse hook command", () => {
   // The declared command fails OPEN when its binary is missing: a shell that
   // cannot find gitleaks exits 127, and the agent host reads any exit other
   // than 2 as "allow". This test is the named mitigation for that trade — a
-  // machine without gitleaks cannot pass `npm run verify`, and CI installs it
-  // before running this suite.
+  // machine without gitleaks cannot pass `npm run verify`, the pre-push gate.
   it("gitleaks is on PATH, because the hook fails open without it", () => {
     const r = sh("gitleaks", ["version"]);
     assert.equal(
@@ -189,8 +188,8 @@ describe("PreToolUse hook command", () => {
 // The invariant this version of the repository added: the hook layer owns no
 // code. The command in hooks.jsonc is the vendor's own binary, so there is no
 // script here whose field-extraction, exit-code mapping, or JSON parsing can
-// rot. This test is what turns that from a README claim into something CI
-// enforces.
+// rot. This test is what turns that from a README claim into something the
+// pre-push gate enforces.
 describe("hook wiring", () => {
   it("hooks.jsonc exists", () => {
     assert.ok(existsSync(HOOKS_JSONC), `${HOOKS_JSONC} is missing, so nothing registers any hook with any agent.`);

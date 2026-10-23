@@ -6,7 +6,6 @@
 [Gg]itleaks
 Trunk
 osv-scanner
-actionlint
 [Ss]hellcheck
 Vale
 Renovate

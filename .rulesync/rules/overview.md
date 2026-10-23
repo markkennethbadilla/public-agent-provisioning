@@ -49,8 +49,8 @@ under pressure. These four layers cannot.
 | Rules | Every turn | rulesync | `.rulesync/rules/` |
 | Skills | On demand, by topic | rulesync, Anthropic Agent Skills format | `.rulesync/skills/` |
 | Tool-call hooks | Before a tool runs | rulesync hook registration, gitleaks detection | `.rulesync/hooks.jsonc` |
-| Git guards | On commit and push | Trunk running gitleaks, osv-scanner, actionlint, shellcheck, git-diff-check | `.trunk/trunk.yaml` |
-| Self-checks | On demand and in CI | `node:test` from the Node standard library | `tests/` |
+| Git guards | On commit and push | Trunk running gitleaks, osv-scanner, shellcheck, git-diff-check | `.trunk/trunk.yaml` |
+| Self-checks | On demand and before every push | `node:test` from the Node standard library | `tests/` |
 
 A "hook" is a script the agent runs before it is allowed to use a tool. It can
 refuse the tool call outright. A "git guard" is the same idea at commit and

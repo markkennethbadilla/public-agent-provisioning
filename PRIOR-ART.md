@@ -25,9 +25,8 @@ These are wired in. Removing one removes a layer.
 | [`anthropics/skills`](https://github.com/anthropics/skills) | 171,113 | 2026-08-21 | `Apache-2.0` per skill | 5 pinned skills: `skill-creator`, `mcp-builder`, `claude-api`, `webapp-testing`, `frontend-design`. No repository-level licence, so check each skill's own `LICENSE.txt` before adding more |
 | [`vale-cli/agent-tools`](https://github.com/vale-cli/agent-tools) | 0 | 2026-08-05 | `MIT` | Vale's own agent skills for setting up and running Vale. Zero stars and vendor-official are not a contradiction; it is simply new |
 | [`google/osv-scanner`](https://github.com/google/osv-scanner) | 10,904 | 2026-08-21 | `Apache-2.0` | Reads the lockfile and flags dependencies with a known vulnerability |
-| [`rhysd/actionlint`](https://github.com/rhysd/actionlint) | 4,162 | 2026-07-16 | `MIT` | Catches a broken workflow file locally instead of on push |
 | [`errata-ai/vale`](https://github.com/errata-ai/vale) | 5,990 | 2026-08-21 | `MIT` | Google style prose linting, blocking on error-level alerts |
-| [`renovatebot/renovate`](https://github.com/renovatebot/renovate) | 22,312 | 2026-08-22 | `AGPL-3.0` | Keeps every pinned version in this table current, and merges patch and minor updates itself once CI is green |
+| [`renovatebot/renovate`](https://github.com/renovatebot/renovate) | 22,312 | 2026-08-22 | `AGPL-3.0` | Keeps every pinned version in this table current, and opens a pull request for each update |
 
 `node:test` from the Node standard library owns layer 5. It has no repository of
 its own because it ships with the runtime, which is the entire reason it was
@@ -53,7 +52,7 @@ maintained than anything this repository could write. The difference is what
 each one leaves for you.
 
 A hook manager runs hooks. Trunk also carries `gitleaks`, `osv-scanner`,
-`actionlint`, and `shellcheck`, downloads them itself, and pins the version of
+and `shellcheck`, downloads them itself, and pins the version of
 each in `.trunk/trunk.yaml`. A fork gets the same linter versions on Windows,
 macOS, and Linux with nothing on `PATH` and no install script.
 

@@ -1,0 +1,3 @@
+# LF in every checkout. rulesync generate --check compares bytes for skill
+# files, so a Windows CRLF checkout reads as drift and blocks every push.
+* text=auto eol=lf
