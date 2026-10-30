@@ -134,10 +134,21 @@ actions:
         - git_hooks: [pre-push]
       notify_on_error: false
 
+    # Opengrep security scan (mkb-agentops spec 114, skill gate-commits-with-trunk).
+    # Scans only files changed since origin/main. Skipped in the self-check
+    # scratch repositories, which have no package.json.
+    - id: block-push-on-opengrep
+      display_name: Refuse a push with a new Opengrep finding
+      run: sh -c '[ -f package.json ] || exit 0; "C:/Program Files/opengrep/opengrep.exe" scan --experimental --disable-version-check --quiet --error --severity ERROR --severity WARNING --baseline-commit origin/main --config C:/ProgramData/opengrep/semgrep-rules .'
+      triggers:
+        - git_hooks: [pre-push]
+      notify_on_error: false
+
   enabled:
     - block-commit-on-findings
     - block-push-on-findings
     - verify-before-push
+    - block-push-on-opengrep
     # Formatting only, and it fixes rather than refuses, so it is safe to keep
     # ahead of the blocking action above.
     - trunk-fmt-pre-commit
