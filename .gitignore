@@ -53,3 +53,13 @@ Desktop.ini
 # Local artifacts
 *.tmp
 *.log
+
+# secrets and keys (2026-11-08)
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*_deploy_key
+.temp_deploy_key
+*.pfx
+*.p12
