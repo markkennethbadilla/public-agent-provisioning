@@ -129,6 +129,13 @@ actions:
     # scratch repositories that have no package.json; there it does nothing.
     - id: verify-before-push
       display_name: Refuse a push that fails npm run verify
+      environment: # the nested self-check pushes run the mise opengrep shim
+        - name: MISE_GLOBAL_CONFIG_FILE
+          value: ${env.MISE_GLOBAL_CONFIG_FILE}
+        - name: PATHEXT
+          value: ${env.PATHEXT}
+        - name: PATH
+          value: ${env.PATH}
       run: sh -c '[ -f package.json ] || exit 0; GITHUB_TOKEN="${GITHUB_TOKEN:-$(gh auth token 2>/dev/null)}" npm run verify'
       triggers:
         - git_hooks: [pre-push]
@@ -139,7 +146,14 @@ actions:
     # scratch repositories, which have no package.json.
     - id: block-push-on-opengrep
       display_name: Refuse a push with a new Opengrep finding
-      run: sh -c '[ -f package.json ] || exit 0; "C:/Program Files/opengrep/opengrep.exe" scan --experimental --disable-version-check --quiet --error --severity ERROR --severity WARNING --baseline-commit origin/main --config C:/ProgramData/opengrep/semgrep-rules .'
+      environment:
+        - name: MISE_GLOBAL_CONFIG_FILE
+          value: ${env.MISE_GLOBAL_CONFIG_FILE}
+        - name: PATHEXT
+          value: ${env.PATHEXT}
+        - name: PATH
+          value: ${env.PATH}
+      run: sh -c '[ -f package.json ] || exit 0; opengrep scan --experimental --disable-version-check --quiet --error --severity ERROR --severity WARNING --baseline-commit origin/main --config C:/ProgramData/opengrep/semgrep-rules .'
       triggers:
         - git_hooks: [pre-push]
       notify_on_error: false
