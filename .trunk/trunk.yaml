@@ -163,7 +163,7 @@ actions:
       environment:
         - name: PATH
           value: ${env.PATH}
-      run: npm run --silent maint
+      run: sh -c '[ -f package.json ] || exit 0; npm run --silent maint'
       triggers:
         - git_hooks: [pre-push]
       notify_on_error: false
