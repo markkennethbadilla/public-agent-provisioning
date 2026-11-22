@@ -53,7 +53,7 @@ gets patched by people who are paid to patch it.
   `npm run verify`, the pre-push gate, whenever `gitleaks` is missing.
 - **Not dependency free.** The previous version of this document claimed "zero
   install dependency beyond git itself" and described the git guards as "two
-  ordinary POSIX shell scripts". Both statements were false, and the next
+  ordinary POSIX shell scripts." Both statements were false, and the next
   section says why.
 
 ## Real dependencies
