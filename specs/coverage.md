@@ -1,0 +1,80 @@
+# Coverage
+
+Against the coverage register in mkb-agentops, skill cover-the-whole-lifecycle.
+
+Open rows: none (2026-11-22). This repo is a forkable template: no UI, no server, no deploy, no database, no AI feature of its own.
+
+- [x] B01 SPEC.md (the single spec; new work changes it in the same commit)
+- [x] B02 SPEC.md: Purpose, What this is, Real dependencies, Locked decisions, Escape hatches, Invariants, Known gaps
+- [x] B03 n/a for private: PUBLIC by design, a template meant to be forked; secured settings hold: `gh api repos/markkennethbadilla/public-agent-provisioning/actions/permissions` says `enabled: false`, gitleaks blocks secrets on commit and push
+- [x] B04 PRIOR-ART.md names each maintained tool adopted and what it was compared with
+- [x] B05 exact versions in `package.json` and `package-lock.json`, Trunk tool pins in `.trunk/trunk.yaml`, `renovate.json` (oh-my-openagent pin included)
+- [x] B06 no secret in the tree; `.gitignore` ignores secret and key files; gitleaks gate (T01)
+- [x] B07 n/a: no dev server
+- [x] B08 n/a: no UI
+- [x] B09 this file
+- [x] B10 n/a: no UI, API or AI
+- [x] B11 n/a: not a site or app
+- [x] B12 n/a: not a site or app; knip still runs on `tests/` inside `npm run maint` (`knip.json`)
+- [x] B13 `.trunk/trunk.yaml` action `maintainability-on-push` runs `npm run maint` (dependency-cruiser, knip, jscpd threshold 0, ESLint `eslint.maint.config.mjs`); SPEC.md "The maintainability gate runs on push"
+- [x] B14 n/a: a repo we own
+- [x] B15 `specs/alignment.md`, dated line with base commit; hook `guard-spec-sync` on every push
+- [x] B16 n/a: no UI
+- [x] B17 n/a: no UI
+- [x] T01 `.trunk/trunk.yaml`: gitleaks@8.30.1 plus `block-commit-on-findings` and `block-push-on-findings`; `tests/git-guards.test.mjs` proves the block
+- [x] T02 osv-scanner@2.5.1 in `.trunk/trunk.yaml`, run by `block-push-on-findings`; `osv-scanner.toml` ignores expire (2026-12-22, 2027-01-23) so each is re-read
+- [x] T03 `.trunk/trunk.yaml` action `block-push-on-opengrep`
+- [x] T04 n/a: no TypeScript web project
+- [x] T05 `tests/*.test.mjs` (`npm test`, 28 of 28 on 2026-11-22), run in the push gate by `npm run verify`
+- [x] T06 n/a: no UI
+- [x] T07 n/a: no UI
+- [x] T08 n/a: no database
+- [x] T09 `npm run verify` in the pre-push gate: node:test reports each case pass or fail, the exit code is the ship verdict
+- [x] T10 n/a: no UI
+- [x] T11 n/a: no AI feature
+- [x] T12 n/a: no AI feature
+- [x] T13 n/a: no AI feature
+- [x] T14 n/a: no UI
+- [x] T15 n/a: no UI
+- [x] T16 n/a: no pages
+- [x] T17 n/a: no form
+- [x] T18 n/a: no analytics
+- [x] T19 n/a: no API
+- [x] T20 n/a: no roles or tenants
+- [x] T21 n/a: not deployed
+- [x] I01 n/a: takes no inbound data
+- [x] I02 n/a: no payment, ads or CRM vendor
+- [x] I03 n/a: no site
+- [x] I04 n/a: sends no email
+- [x] I05 n/a: calls no paid API
+- [x] I06 n/a: no public form or AI endpoint
+- [x] D01 n/a: not deployed
+- [x] D02 n/a: not deployed
+- [x] D03 n/a: not deployed
+- [x] D04 n/a: not a web app
+- [x] D05 n/a: not a web app
+- [x] D06 n/a: not an internal app
+- [x] D07 n/a: not deployed
+- [x] R01 n/a: not a website
+- [x] R02 n/a: not deployed
+- [x] R03 n/a: no scheduled job
+- [x] R04 n/a: no Coolify service
+- [x] R05 n/a: not deployed
+- [x] R06 n/a: WeAssist servers and sites only
+- [x] R07 n/a: no daily check
+- [x] R08 n/a: not a server
+- [x] R09 n/a: not a server
+- [x] R10 n/a: no scripts or jobs; the only code is `tests/`, whose outcome node:test prints
+- [x] R11 n/a: touches no production system
+- [x] R12 n/a: not a web app
+- [x] R13 n/a: no AI feature
+- [x] R14 n/a: not deployed
+- [x] R16 `rulesync install --frozen && rulesync generate --check` in `npm run verify` fails the push when declared skills, hooks or MCP servers drift from the generated files; `tests/hooks.test.mjs` fails when gitleaks is missing from PATH
+- [x] R17 n/a: no automation sends or reports events
+- [x] R18 n/a: no outbound messages
+- [x] X01 n/a: not deployed
+- [x] X02 SPEC.md "Locked decisions": each break met (the self-answering commit prompt, CRLF drift) became a blocking action or a test in `tests/`
+- [x] V01 n/a: no database
+- [x] V02 n/a: no database
+- [x] V03 nothing to file: the hook `guard-irreversible` holds it
+- [x] V04 n/a: not a server
