@@ -1,0 +1,9 @@
+{
+  "format": ["javascript"],
+  "ignore": ["**/node_modules/**", "**/*.md", "**/*.json", "**/styles/**", "**/.agents/**", "**/.claude/**", "**/.cline/**", "**/.cursor/**", "**/.grok/**", "**/.opencode/**", "**/.github/**", "**/.rulesync/skills/.curated/**"],
+  "minLines": 15,
+  "minTokens": 100,
+  "reporters": ["console"],
+  "gitignore": true,
+  "threshold": 0
+}

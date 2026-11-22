@@ -158,7 +158,18 @@ actions:
         - git_hooks: [pre-push]
       notify_on_error: false
 
+    - id: maintainability-on-push
+      display_name: Refuse a push that adds maintainability debt (register B13)
+      environment:
+        - name: PATH
+          value: ${env.PATH}
+      run: npm run --silent maint
+      triggers:
+        - git_hooks: [pre-push]
+      notify_on_error: false
+
   enabled:
+    - maintainability-on-push
     - block-commit-on-findings
     - block-push-on-findings
     - verify-before-push

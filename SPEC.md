@@ -118,6 +118,15 @@ The replacement is the `block-commit-on-findings` action in `.trunk/trunk.yaml`,
 which runs `trunk check --ci`. The `--ci` flag never prompts and exits non-zero
 on a finding.
 
+### The maintainability gate runs on push
+
+The pre-push action `maintainability-on-push` in `.trunk/trunk.yaml` runs `npm run maint`
+(register B13): dependency-cruiser (import cycles, unresolvable imports), knip (dead
+files, exports, packages, `knip.json`), jscpd (copy-paste, threshold 0 percent, today 0
+percent) and ESLint (`eslint.maint.config.mjs`: size, complexity, commented-out code,
+skipped tests). It scans only this repository's own JavaScript, which is the
+`tests/` folder; generated agent files and community skills are ignored.
+
 ### Generated files are committed, and the push gate fails on drift
 
 The 1,209 files agents actually read are committed rather than generated at

@@ -4,3 +4,8 @@
 id = "GHSA-vfj7-8cjw-p6xm"
 ignoreUntil = 2027-01-23T00:00:00Z
 reason = "braces 3.0.3 is the last release and is listed as affected with no fix; reached only through rulesync, globby, fast-glob and micromatch on our own glob patterns, never on input from outside"
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-12-22T00:00:00Z
+reason = "minimatch 10.2.6 under eslint-plugin-sonarjs, dev-only lint gate on our own globs; fix is 11.0.1, a major bump sonarjs does not yet allow"

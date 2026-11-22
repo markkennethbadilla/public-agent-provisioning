@@ -1,0 +1,6 @@
+{
+  "entry": ["tests/*.test.mjs"],
+  "project": ["tests/**/*.mjs"],
+  "ignoreBinaries": ["vale"],
+  "ignoreIssues": { "tests/lib/proc.mjs": ["exports"], "tests/lib/trunk.mjs": ["exports"] }
+}
