@@ -15,8 +15,8 @@ Open rows: none (2026-11-22). This repo is a forkable template: no UI, no server
 - [x] B09 this file
 - [x] B10 n/a: no UI, API or AI
 - [x] B11 n/a: not a site or app
-- [x] B12 n/a: not a site or app; knip still runs on `tests/` inside `npm run maint` (`knip.json`)
-- [x] B13 `.trunk/trunk.yaml` action `maintainability-on-push` runs `npm run maint` (dependency-cruiser, knip, jscpd threshold 0, ESLint `eslint.maint.config.mjs`); SPEC.md "The maintainability gate runs on push"
+- [x] B12 n/a: not a site or app; `knip` still runs on `tests/` inside `npm run maint` (`knip.json`)
+- [x] B13 `.trunk/trunk.yaml` action `maintainability-on-push` runs `npm run maint` (`dependency-cruiser`, `knip`, `jscpd` threshold 0, ESLint `eslint.maint.config.mjs`); SPEC.md "The maintainability gate runs on push"
 - [x] B14 n/a: a repo we own
 - [x] B15 `specs/alignment.md`, dated line with base commit; hook `guard-spec-sync` on every push
 - [x] B16 n/a: no UI
@@ -58,7 +58,7 @@ Open rows: none (2026-11-22). This repo is a forkable template: no UI, no server
 - [x] R01 n/a: not a website
 - [x] R02 n/a: not deployed
 - [x] R03 n/a: no scheduled job
-- [x] R04 n/a: no Coolify service
+- [x] R04 n/a: no `Coolify` service
 - [x] R05 n/a: not deployed
 - [x] R06 n/a: WeAssist servers and sites only
 - [x] R07 n/a: no daily check
