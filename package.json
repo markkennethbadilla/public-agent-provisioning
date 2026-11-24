@@ -27,7 +27,7 @@
     "globals": "17.14.0",
     "jscpd": "5.4.3",
     "knip": "6.45.1",
-    "rulesync": "16.14.0"
+    "rulesync": "16.39.1"
   },
   "overrides": {
     "tar": "^7.5.22",
