@@ -190,6 +190,14 @@ block is a hook rather than a permission because rulesync's permission model
 has no key that denies a named tool; a `claudecode.permissions.deny` list is
 silently dropped (verified against 16.14.0).
 
+### Every promise here is traced
+
+`specs/requirements.md` holds one OpenFastTrace item per invariant, locked
+decision and known gap of this document, each naming the test or gate that
+holds it or the gap that remains. The pre-push action `trace-on-push` refuses a
+push when a quoted line changed or an enforcer vanished. It calls the
+maintainer's shared tracer and skips itself in a fork that lacks it.
+
 ## Removing or replacing a layer
 
 Forks copy this repository once and never receive updates, so nothing here can break a fork in place. Inside this repository, removing or replacing something follows four rules:

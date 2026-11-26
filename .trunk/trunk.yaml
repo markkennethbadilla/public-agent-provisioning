@@ -195,9 +195,23 @@ actions:
         - git_hooks: [pre-push]
       notify_on_error: false
 
+    # Coverage register T24: every SPEC promise is a traced OpenFastTrace item.
+    # The tracer is the maintainer's shared copy; a fork or a scratch self-check
+    # repository without it or without the register skips this action.
+    - id: trace-on-push
+      display_name: Refuse a push with an untraced or unenforced SPEC item
+      environment:
+        - name: PATH
+          value: ${env.PATH}
+      run: sh -c 't=A:/personal-markkennethbadilla/mkb-agentops/scripts/trace.mjs; [ -f specs/requirements.md ] && [ -f "$t" ] || exit 0; node "$t" specs/requirements.md'
+      triggers:
+        - git_hooks: [pre-push]
+      notify_on_error: false
+
   enabled:
     - gate-clock-start
     - maintainability-on-push
+    - trace-on-push
     - block-commit-on-findings
     - block-push-on-findings
     - verify-before-push

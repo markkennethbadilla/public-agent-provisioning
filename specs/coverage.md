@@ -28,6 +28,7 @@ Open rows: none (2026-11-22). This repo is a forkable template: no UI, no server
 - [x] B22 n/a: no host a person browses to; a template repo
 - [x] B23 `SPEC.md` "Locked decisions": six records (maintained owner per layer, blocking checks only, maintainability gate on push, committed generated files, one config source, plan in files), each with its reason and the option rejected; `PRIOR-ART.md` holds the tools looked at and not adopted
 - [x] T23 n/a: no search or retrieval
+- [x] T24 `specs/requirements.md` (OpenFastTrace): every invariant, locked decision and known gap of `SPEC.md` as a traced item, run by Trunk action `trace-on-push`
 - [x] T01 `.trunk/trunk.yaml`: gitleaks@8.30.1 plus `block-commit-on-findings` and `block-push-on-findings`; `tests/git-guards.test.mjs` proves the block
 - [x] T02 osv-scanner@2.5.1 in `.trunk/trunk.yaml`, run by `block-push-on-findings`; `osv-scanner.toml` ignores expire (2026-12-22, 2027-01-23) so each is re-read
 - [x] T03 `.trunk/trunk.yaml` action `block-push-on-opengrep`
