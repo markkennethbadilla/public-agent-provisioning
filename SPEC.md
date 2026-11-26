@@ -190,6 +190,15 @@ block is a hook rather than a permission because rulesync's permission model
 has no key that denies a named tool; a `claudecode.permissions.deny` list is
 silently dropped (verified against 16.14.0).
 
+## Removing or replacing a layer
+
+Forks copy this repository once and never receive updates, so nothing here can break a fork in place. Inside this repository, removing or replacing something follows four rules:
+
+- The commit that removes a layer, a pinned skill, an MCP server or a script also removes every caller: `npm run verify`, the git hooks, the generated agent files (regenerated and committed, since the push gate fails on drift) and the lines in this document and `README.md` that name it.
+- A replacement ships in the same commit as the removal. No second copy is kept for compatibility.
+- The commit message says what went and what replaced it, so someone comparing their fork against this repository sees the change in `git log`.
+- `PRIOR-ART.md` moves a removed tool from "Dependencies" to the tools looked at and not adopted, with why it left, so the next reader does not adopt it again without knowing.
+
 ## Escape hatches
 
 Every escape hatch below belongs to a maintained tool, and none of them force a

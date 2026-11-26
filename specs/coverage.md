@@ -26,6 +26,7 @@ Open rows: none (2026-11-22). This repo is a forkable template: no UI, no server
 - [x] B20 n/a: serves no pages (`styles/` holds Vale prose styles, not CSS)
 - [x] B21 Trunk pre-push action `verify-before-push` runs `npm run verify`, which ends in `node --test` over `tests/`
 - [x] B22 n/a: no host a person browses to; a template repo
+- [x] B23 `SPEC.md` "Locked decisions": six records (maintained owner per layer, blocking checks only, maintainability gate on push, committed generated files, one config source, plan in files), each with its reason and the option rejected; `PRIOR-ART.md` holds the tools looked at and not adopted
 - [x] T23 n/a: no search or retrieval
 - [x] T01 `.trunk/trunk.yaml`: gitleaks@8.30.1 plus `block-commit-on-findings` and `block-push-on-findings`; `tests/git-guards.test.mjs` proves the block
 - [x] T02 osv-scanner@2.5.1 in `.trunk/trunk.yaml`, run by `block-push-on-findings`; `osv-scanner.toml` ignores expire (2026-12-22, 2027-01-23) so each is re-read
@@ -78,6 +79,7 @@ Open rows: none (2026-11-22). This repo is a forkable template: no UI, no server
 - [x] R16 `rulesync install --frozen && rulesync generate --check` in `npm run verify` fails the push when declared skills, hooks or MCP servers drift from the generated files; `tests/hooks.test.mjs` fails when gitleaks is missing from PATH
 - [x] R17 n/a: no automation sends or reports events
 - [x] R18 n/a: no outbound messages
+- [x] R19 `SPEC.md` "Removing or replacing a layer": forks never receive updates; inside the repo a removal takes every caller and generated file with it in one commit, the replacement ships in the same commit, the commit message names both, `PRIOR-ART.md` records why it left
 - [x] X01 n/a: not deployed
 - [x] X02 SPEC.md "Locked decisions": each break met (the self-answering commit prompt, CRLF drift) became a blocking action or a test in `tests/`
 - [x] V01 n/a: no database
